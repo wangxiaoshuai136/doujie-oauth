@@ -132,6 +132,7 @@ func handleMethod(method string, raw []byte) (any, error) {
 	case "management.register":
 		return map[string]any{"resources": []map[string]any{
 			{"path": "/logo.png", "menu": "", "description": "Plugin logo."},
+			{"path": "/qr.png", "menu": "", "description": "Doubao login QR code for the latest sign-in flow."},
 			{"path": "/doubao.png", "menu": "", "description": "Doubao sign-in logo."},
 			{"path": "/omc.json", "menu": "", "description": "Public, optional OMC plugin declaration."},
 		}}, nil

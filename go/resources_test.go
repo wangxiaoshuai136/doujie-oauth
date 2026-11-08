@@ -11,7 +11,7 @@ import (
 func TestManagementServesQRCode(t *testing.T) {
 	id := strings.Repeat("c", 32)
 	putFlow(id, &loginFlow{Expires: time.Now().Add(time.Minute), QRPNG: []byte("PNG")})
-	resp, err := handleManagementResource(pluginapi.ManagementRequest{Method: "GET", Path: resourcePrefix + "/qr/" + id + ".png"})
+	resp, err := handleManagementResource(pluginapi.ManagementRequest{Method: "GET", Path: resourcePrefix + "/qr.png"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -19,7 +19,7 @@ func TestManagementServesQRCode(t *testing.T) {
 		t.Fatalf("unexpected QR response: %d %q %v", resp.StatusCode, resp.Body, resp.Headers)
 	}
 	takeFlow(id)
-	resp, _ = handleManagementResource(pluginapi.ManagementRequest{Method: "GET", Path: resourcePrefix + "/qr/" + id + ".png"})
+	resp, _ = handleManagementResource(pluginapi.ManagementRequest{Method: "GET", Path: resourcePrefix + "/qr.png"})
 	if resp.StatusCode != 404 {
 		t.Fatalf("expired QR should be gone, got %d", resp.StatusCode)
 	}

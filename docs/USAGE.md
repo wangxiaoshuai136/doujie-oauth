@@ -25,7 +25,7 @@ URL to the plugin. It is used to build the QR image address.
 
 1. Open the panel's plugin / OAuth page and start the `豆包` sign-in entry.
 2. The panel opens a QR image served by the plugin at
-   `/v0/resource/plugins/omc-doubao-oauth/qr/<flow>.png`.
+   `/v0/resource/plugins/omc-doubao-oauth/qr.png` (the latest active flow).
 3. Scan it with the Doubao mobile app and confirm on the phone.
 4. The plugin polls `check_qrconnect`, follows the final redirect, and writes an
    auth file whose type is `doubao`.
@@ -153,3 +153,4 @@ Token counts are estimates because Doubao's web endpoints do not return usage.
 - The plugin never logs request bodies or cookies.
 - The external signer receives URLs and bodies. Run it on the same machine and
   keep it bound to loopback.
+

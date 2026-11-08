@@ -3,7 +3,6 @@ package main
 import (
 	_ "embed"
 	"net/http"
-	"strings"
 
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
 )
@@ -42,13 +41,8 @@ func handleManagementResource(req pluginapi.ManagementRequest) (pluginapi.Manage
 		body = []byte(omcDescriptorJSON)
 		contentType = "application/json; charset=utf-8"
 		cacheControl = "no-cache"
-	case strings.HasPrefix(req.Path, resourcePrefix+"/qr/"):
-		id := strings.TrimPrefix(req.Path, resourcePrefix+"/qr/")
-		id = strings.TrimSuffix(id, ".png")
-		if len(id) != 32 || strings.ContainsAny(id, "/\\") {
-			return pluginapi.ManagementResponse{StatusCode: http.StatusNotFound, Body: []byte("not found")}, nil
-		}
-		flow := peekFlow(id)
+	case req.Path == resourcePrefix+"/qr.png":
+		flow := newestFlow()
 		if flow == nil || len(flow.QRPNG) == 0 {
 			return pluginapi.ManagementResponse{StatusCode: http.StatusNotFound, Body: []byte("not found")}, nil
 		}
@@ -67,3 +61,4 @@ func handleManagementResource(req pluginapi.ManagementRequest) (pluginapi.Manage
 		Body: append([]byte(nil), body...),
 	}, nil
 }
+

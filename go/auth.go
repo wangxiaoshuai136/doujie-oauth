@@ -58,6 +58,23 @@ func takeFlow(id string) *loginFlow {
 	return flow
 }
 
+func newestFlow() *loginFlow {
+	flowMu.Lock()
+	defer flowMu.Unlock()
+	var newest *loginFlow
+	var newestAt time.Time
+	for _, flow := range flowStore {
+		if flow == nil || flow.Expires.Before(time.Now()) || len(flow.QRPNG) == 0 {
+			continue
+		}
+		if newest == nil || flow.Expires.After(newestAt) {
+			newest = flow
+			newestAt = flow.Expires
+		}
+	}
+	return newest
+}
+
 func peekFlow(id string) *loginFlow {
 	flowMu.Lock()
 	defer flowMu.Unlock()
@@ -169,8 +186,8 @@ func startLogin(req pluginapi.AuthLoginStartRequest, sender httpSender) (plugina
 	if err != nil {
 		return out, err
 	}
-	base := absoluteBase(req.BaseURL, cfg.PublicBaseURL)
-	qrPath := resourcePrefix + "/qr/" + flowID + ".png"
+	base := absoluteBase(cfg.PublicBaseURL, req.BaseURL)
+	qrPath := resourcePrefix + "/qr.png"
 	out = pluginapi.AuthLoginStartResponse{
 		Provider:  credentialProvider,
 		URL:       base + qrPath,
@@ -419,3 +436,4 @@ func loadQRImage(sender httpSender, candidates ...string) ([]byte, error) {
 	}
 	return nil, errors.New("Doubao login QR code has no image")
 }
+
