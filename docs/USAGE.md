@@ -135,12 +135,24 @@ to the network.
 
 Token counts are estimates because Doubao's web endpoints do not return usage.
 
-## 6. Quota card
+## 6. Quota card and reset cards
 
-The panel's quota card for a `doubao` credential is a local estimate computed
-from request telemetry (5h / 7d rolling windows). `resetTime` marks when the
-oldest request in each window ages out. There is no vendor reset API, so the
-reset action is intentionally unsupported.
+The quota card uses Doubao's account endpoints:
+
+- `POST /alice/commerce/sale/subscription/quota/summary/` with
+  `{"product_line":"membership"}` returns
+  `data.window_limit_section.window_limit_groups[].window_limits[]`. Each window
+  limit carries `start_time`, `end_time`, `used_amount`, `total_amount` and a
+  unit, which maps to the panel's `5h` / `7d` buckets and reset times.
+- `POST /alice/commerce/marketing/card/balance/` returns the reset-card stock
+  (`available_count_by_card_key.pc_quota_reset_card` / `quota_reset_card`).
+- `POST /alice/commerce/marketing/card/use/` consumes one card with
+  `{"card_key":"pc_quota_reset_card","use_request_id":"<uuid>"}`.
+
+These endpoints work with the session cookies only; the desktop/web client
+signs chat traffic with `a_bogus`, but the commerce endpoints do not require it.
+If the account has no subscription windows, the card is labeled as a local
+request-based estimate.
 
 ## 7. Troubleshooting
 
@@ -160,5 +172,6 @@ reset action is intentionally unsupported.
 - The plugin never logs request bodies or cookies.
 - The external signer receives URLs and bodies. Run it on the same machine and
   keep it bound to loopback.
+
 
 

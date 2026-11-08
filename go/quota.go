@@ -138,11 +138,11 @@ func quotaDescription() pluginapi.QuotaDescribeResponse {
 	return pluginapi.QuotaDescribeResponse{
 		SupportedProviders: []string{credentialProvider},
 		DisplayName:        "Doubao",
-		SupportsReset:      false,
+		SupportsReset:      true,
 	}
 }
 
-func quotaFetch(req pluginapi.QuotaFetchRequest) (pluginapi.QuotaFetchResponse, error) {
+func localQuotaFetch(req pluginapi.QuotaFetchRequest) (pluginapi.QuotaFetchResponse, error) {
 	events := usageEvents.snapshot(req.AuthID)
 	now := time.Now()
 	fiveHour := windowBounds(events, 5*time.Hour, now)

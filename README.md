@@ -133,20 +133,22 @@ See [docs/USAGE.md](docs/USAGE.md).
 
 ## Quota display
 
-Doubao does not expose a public quota endpoint, so the plugin renders a
-**local estimate** card instead: it records every chat request and rate-limit
-failure in two rolling windows (5 hours / 7 days) and reports
+The plugin reads Doubao's own account data instead of guessing:
 
-- `5h` / `7d` buckets with a remaining-fraction estimate (soft limits of five
-  requests per 5h and thirty per 7d, reduced further by failures),
-- a `resetTime` derived from the oldest request still inside each window
-  (window start + 5h / + 7d),
-- summary metrics for request counts and failures.
+| Endpoint | Purpose |
+| --- | --- |
+| `POST /alice/commerce/sale/subscription/quota/summary/` | subscription windows (`window_limit_section.window_limit_groups[].window_limits[]` with `used_amount` / `total_amount` / `start_time` / `end_time`) |
+| `POST /alice/commerce/marketing/card/balance/` | reset-card stock (`pc_quota_reset_card`, `quota_reset_card`) |
+| `POST /alice/commerce/marketing/card/use/` | consume one reset card |
 
-The card updates as you chat through CPA. It is an estimate of your account's
-soft limits, not an authoritative number; Doubao's real counters live
-server-side and may differ.
+The panel therefore shows real `5h` / `7d` buckets with reset times, plus an
+**额度重置卡** card with the available card count and a reset action. When the
+account has no subscription windows (free account) the plugin falls back to a
+local request-based estimate and labels it as such.
 
+These commerce endpoints accept the session cookies directly and do **not**
+require the chat request signature. Chat requests still need the `a_bogus`
+signature on the `chat` endpoint; `samantha` works with cookies alone.
 ## Limitations
 
 - Text-only in this version. Image, file and tool-use blocks are noted in the
@@ -197,6 +199,7 @@ This project is unofficial and is not affiliated with, endorsed by, or
 sponsored by ByteDance. "Doubao" and "豆包" are trademarks of their respective
 owners. You are responsible for complying with the vendor's terms and for any
 consequences of using your account session through this plugin.
+
 
 
 

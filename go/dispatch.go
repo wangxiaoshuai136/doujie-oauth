@@ -25,6 +25,16 @@ type rpcModel struct {
 	CallbackID string `json:"host_callback_id"`
 }
 
+type rpcQuotaFetch struct {
+	pluginapi.QuotaFetchRequest
+	CallbackID string `json:"host_callback_id"`
+}
+
+type rpcQuotaReset struct {
+	pluginapi.QuotaResetRequest
+	CallbackID string `json:"host_callback_id"`
+}
+
 type rpcExecution struct {
 	pluginapi.ExecutorRequest
 	CallbackID string `json:"host_callback_id"`
@@ -174,13 +184,21 @@ func handleMethod(method string, raw []byte) (any, error) {
 	case "quota.describe":
 		return quotaDescription(), nil
 	case "quota.fetch":
-		var req pluginapi.QuotaFetchRequest
+		var req rpcQuotaFetch
 		if err := unmarshal(raw, &req); err != nil {
 			return nil, err
 		}
-		return quotaFetch(req)
+		return quotaFetch(req.QuotaFetchRequest, cpaSender{callbackID: req.CallbackID})
 	case "quota.reset":
-		return nil, pluginabi.NewError("not_supported", "Doubao rolling windows cannot be reset", http.StatusBadRequest)
+		var req rpcQuotaReset
+		if err := unmarshal(raw, &req); err != nil {
+			return nil, err
+		}
+		resp, err := quotaReset(req.QuotaResetRequest, cpaSender{callbackID: req.CallbackID})
+		if err != nil {
+			return nil, pluginabi.NewError("reset_failed", err.Error(), 400)
+		}
+		return resp, nil
 	case "executor.count_tokens":
 		return nil, pluginabi.NewError("not_supported", "Doubao does not provide a verified token-count endpoint", http.StatusNotImplemented)
 	case "executor.http_request":

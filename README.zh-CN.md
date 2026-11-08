@@ -122,17 +122,20 @@ Content-Type: application/json
 
 ## 额度显示
 
-豆包没有公开的额度查询端点，所以插件展示的是**本地估算**额度卡：记录每次对话
-请求与限流失败，按 5 小时 / 7 天两个滚动窗口统计，并输出
+插件直接读取豆包账号自己的数据，而不是猜：
 
-- `5h` / `7d` 两个桶的剩余比例估算（软上限按 5h 内 5 次、7d 内 30 次起算，
-  失败会进一步下调），
-- 由窗口内最早一次请求推算的 `resetTime`（窗口起点 + 5h / + 7d），
-- 请求数、失败数等汇总指标。
+| 接口 | 用途 |
+| --- | --- |
+| `POST /alice/commerce/sale/subscription/quota/summary/` | 订阅窗口（`window_limit_section.window_limit_groups[].window_limits[]`，含 `used_amount` / `total_amount` / `start_time` / `end_time`） |
+| `POST /alice/commerce/marketing/card/balance/` | 重置卡库存（`pc_quota_reset_card`、`quota_reset_card`） |
+| `POST /alice/commerce/marketing/card/use/` | 使用一张重置卡 |
 
-额度卡随对话实时更新。它是账号软上限的估算值，不是权威数字；真实计数在豆包
-服务端，可能与估算不同。
+面板因此会显示真实的 `5h` / `7d` 额度桶与重置时间，以及一张**额度重置卡**卡，
+展示可用张数并提供重置操作。账号没有订阅窗口（免费账号）时，插件回退到本地
+请求估算，并明确标注为估算。
 
+这些 commerce 接口只认登录 Cookie，**不需要**对话用的 `a_bogus` 签名；聊天请求
+在 `chat` 端点仍需要签名，`samantha` 端点仅靠 Cookie 即可。
 ## 限制
 
 - 当前版本仅处理文本。图片、文件、工具调用块会在提示词里标注，但不会执行。
@@ -177,5 +180,6 @@ MIT，见 [LICENSE](LICENSE)。
 本项目为非官方项目，与字节跳动无隶属、背书或赞助关系。"豆包""Doubao"
 是其各自权利人的商标。使用账号登录态接入本插件时，请自行确认并遵守厂商
 服务条款，自行承担由此产生的后果。
+
 
 

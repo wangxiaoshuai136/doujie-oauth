@@ -30,3 +30,8 @@ Thumbs.db
 .vscode/
 
 doubao-cli-docs.txt
+
+# reverse-engineering artifacts
+/desktop-web-chunks/
+/tools/
+

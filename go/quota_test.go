@@ -50,7 +50,7 @@ func TestRemainingFractionAndReset(t *testing.T) {
 func TestQuotaFetchShape(t *testing.T) {
 	usageEvents.record("auth-a", false)
 	usageEvents.record("auth-a", true)
-	resp, err := quotaFetch(pluginapi.QuotaFetchRequest{AuthID: "auth-a", StorageJSON: []byte(`{"email":"tester"}`)})
+	resp, err := quotaFetch(pluginapi.QuotaFetchRequest{AuthID: "auth-a", StorageJSON: []byte(`{"email":"tester"}`)}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +73,7 @@ func TestQuotaFetchShape(t *testing.T) {
 
 func TestQuotaDescription(t *testing.T) {
 	desc := quotaDescription()
-	if desc.DisplayName != "Doubao" || desc.SupportsReset {
+	if desc.DisplayName != "Doubao" || !desc.SupportsReset {
 		t.Fatalf("unexpected description: %+v", desc)
 	}
 	if len(desc.SupportedProviders) != 1 || desc.SupportedProviders[0] != credentialProvider {
