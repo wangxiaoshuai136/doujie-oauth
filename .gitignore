@@ -1,0 +1,32 @@
+/dist/
+/build/
+/go/omc-doubao-oauth.*
+*.dll
+*.so
+*.dylib
+*.h
+
+# reference material (never part of the plugin)
+/omc-zcode-oauth/
+/trae-ref/
+/doubao2api-ref/
+/doubao-cli-pkg/
+/doubao-cli-2.31.3-win-x64/
+/doubao-cli-win.zip
+*.tgz
+readme-*.txt
+doubao-cli*.md
+doubao-cli*.html
+llms.txt
+personal-sub.md
+cli-quick-start.md
+cli-terminal.md
+cli-commands.md
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+doubao-cli-docs.txt

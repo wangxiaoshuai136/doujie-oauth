@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "plugin_id": "omc-doubao-oauth",
+  "plugin_version": "0.1.0",
+  "i18n": {
+    "description": {
+      "zh": "非官方豆包（Doubao）提供商插件：扫码登录豆包网页/桌面账号，向 CLIProxyAPI 暴露豆包对话模型。签名层可替换，默认直连。与字节跳动无关联。",
+      "en": "Unofficial Doubao provider: sign in with a Doubao web/desktop account via QR, and expose Doubao chat models to CLIProxyAPI. The signing layer is pluggable; direct mode is the default. Not affiliated with ByteDance.",
+      "zh-Hant": "非官方豆包（Doubao）提供者外掛：掃碼登入豆包網頁/桌面帳號，向 CLIProxyAPI 暴露豆包對話模型。簽名層可替換，預設直連。與字節跳動無關聯。"
+    }
+  }
+}

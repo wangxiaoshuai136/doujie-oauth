@@ -1,0 +1,109 @@
+name: Build and release
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  PLUGIN_ID: omc-doubao-oauth
+  VERSION: 0.1.0
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+      - name: Download modules
+        working-directory: go
+        run: go mod download
+      - name: Test
+        working-directory: go
+        run: go test ./...
+      - name: Vet
+        working-directory: go
+        run: go vet ./...
+
+  build:
+    name: Build ${{ matrix.goos }}/${{ matrix.goarch }}
+    needs: test
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-24.04, goos: linux, goarch: amd64, ext: so }
+          - { runner: ubuntu-24.04-arm, goos: linux, goarch: arm64, ext: so }
+          - { runner: macos-15-intel, goos: darwin, goarch: amd64, ext: dylib }
+          - { runner: macos-15, goos: darwin, goarch: arm64, ext: dylib }
+          - { runner: windows-latest, goos: windows, goarch: amd64, ext: dll }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+      - name: Add MSYS2 toolchain to PATH
+        if: runner.os == 'Windows'
+        shell: bash
+        run: echo "C:/msys64/mingw64/bin" >> "$GITHUB_PATH"
+      - name: Build shared library
+        shell: bash
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cd go
+          CGO_ENABLED=1 go build -trimpath -buildmode=c-shared \
+            -ldflags "-s -w -X main.pluginVersion=${VERSION}" \
+            -o "../dist/${PLUGIN_ID}.${{ matrix.ext }}" .
+          rm -f "../dist/${PLUGIN_ID}.h"
+      - name: Package
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          archive="${PLUGIN_ID}_${VERSION}_${{ matrix.goos }}_${{ matrix.goarch }}.zip"
+          zip -r "$archive" "${PLUGIN_ID}.${{ matrix.ext }}" ../README.md ../README.zh-CN.md ../LICENSE
+          python3 -c "import hashlib,sys; p=sys.argv[1]; print(hashlib.sha256(open(p,'rb').read()).hexdigest()+'  '+p)" "$archive" > "$archive.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PLUGIN_ID }}_${{ matrix.goos }}_${{ matrix.goarch }}
+          path: |
+            dist/*.zip
+            dist/*.zip.sha256
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Verify assets
+        run: |
+          set -euo pipefail
+          ls -l dist
+          test -n "$(ls dist/*.zip 2>/dev/null)"
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.zip
+            dist/*.zip.sha256
+          generate_release_notes: true
