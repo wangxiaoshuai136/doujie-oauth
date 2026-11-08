@@ -102,13 +102,12 @@ func handleMethod(method string, raw []byte) (any, error) {
 	case "auth.identifier":
 		return map[string]any{
 			"identifier":           entryID,
-			"identifiers":          []string{entryID},
+			"identifiers":          []string{entryID, desktopEntryID},
 			"credential_providers": []string{credentialProvider},
-			"entries": []map[string]any{{
-				"identifier": entryID,
-				"name":       "豆包",
-				"logo":       resourceAssetURL("doubao.png"),
-			}},
+			"entries": []map[string]any{
+				{"identifier": entryID, "name": "豆包", "logo": resourceAssetURL("doubao.png")},
+				{"identifier": desktopEntryID, "name": "豆包（桌面端导入）", "logo": resourceAssetURL("doubao.png")},
+			},
 		}, nil
 	case "executor.identifier", "model.identifier":
 		return map[string]string{"identifier": credentialProvider}, nil
@@ -144,6 +143,7 @@ func handleMethod(method string, raw []byte) (any, error) {
 		return map[string]any{"resources": []map[string]any{
 			{"path": "/logo.png", "menu": "", "description": "Plugin logo."},
 			{"path": "/qr.png", "menu": "", "description": "Doubao login QR code for the latest sign-in flow."},
+			{"path": "/imported.html", "menu": "", "description": "Desktop import result page."},
 			{"path": "/doubao.png", "menu": "", "description": "Doubao sign-in logo."},
 			{"path": "/omc.json", "menu": "", "description": "Public, optional OMC plugin declaration."},
 		}}, nil

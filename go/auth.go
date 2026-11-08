@@ -28,11 +28,12 @@ const (
 )
 
 type loginFlow struct {
-	Token   string
-	CSRF    string
-	Cookies map[string]string
-	Expires time.Time
-	QRPNG   []byte
+	Token    string
+	CSRF     string
+	Cookies  map[string]string
+	Expires  time.Time
+	QRPNG    []byte
+	Imported *pluginapi.AuthData
 }
 
 var flowMu sync.Mutex
@@ -128,6 +129,9 @@ func startLogin(req pluginapi.AuthLoginStartRequest, sender httpSender) (plugina
 	key, err := loadStateKey(req.Host.AuthDir)
 	if err != nil {
 		return out, err
+	}
+	if req.Provider == desktopEntryID {
+		return startDesktopImport(req, sender, key)
 	}
 	jar := map[string]string{}
 	resp, err := httpGet(sender, doubaoRoot+"/", browserHeaders(nil), jar)
@@ -257,6 +261,10 @@ func pollLogin(req pluginapi.AuthLoginPollRequest, sender httpSender) (pluginapi
 	if flow == nil {
 		return pluginapi.AuthLoginPollResponse{Status: pluginapi.AuthLoginStatusError, Message: "登录流程已失效，请重新开始"}, nil
 	}
+	if flow.Imported != nil {
+		takeFlow(flowID)
+		return pluginapi.AuthLoginPollResponse{Status: pluginapi.AuthLoginStatusSuccess, Auth: *flow.Imported}, nil
+	}
 	next := url.QueryEscape(doubaoRoot)
 	target := doubaoRoot + "/passport/web/check_qrconnect/?next=" + next + "&token=" + url.QueryEscape(flow.Token) + "&aid=" + passportAID
 	resp, err := httpGet(sender, target, browserHeaders(http.Header{"X-Tt-Passport-Csrf-Token": {flow.CSRF}}), flow.Cookies)
@@ -343,7 +351,7 @@ func authFromCookies(jar map[string]string) (pluginapi.AuthData, error) {
 }
 
 func parseAuth(req pluginapi.AuthParseRequest) pluginapi.AuthParseResponse {
-	if req.Provider != entryID && req.Provider != credentialProvider {
+	if req.Provider != entryID && req.Provider != desktopEntryID && req.Provider != credentialProvider {
 		return pluginapi.AuthParseResponse{}
 	}
 	var persisted struct {
@@ -435,4 +443,42 @@ func loadQRImage(sender httpSender, candidates ...string) ([]byte, error) {
 		}
 	}
 	return nil, errors.New("Doubao login QR code has no image")
+}
+
+func startDesktopImport(req pluginapi.AuthLoginStartRequest, sender httpSender, key []byte) (pluginapi.AuthLoginStartResponse, error) {
+	var out pluginapi.AuthLoginStartResponse
+	if req.Host.AuthDir == "" {
+		return out, errors.New("CPA auth directory unavailable")
+	}
+	cookies, err := readDesktopCookies()
+	if err != nil {
+		return out, err
+	}
+	authData, err := importDesktopAuth(sender, cookies)
+	if err != nil {
+		return out, err
+	}
+	flowID, err := randomHex(16)
+	if err != nil {
+		return out, errors.New("cannot generate login state")
+	}
+	expires := time.Now().Add(flowsTTL)
+	putFlow(flowID, &loginFlow{Expires: expires, Imported: &authData})
+	state, err := sealState(key, flowID, expires)
+	if err != nil {
+		return out, err
+	}
+	cfg := getConfig()
+	base := absoluteBase(cfg.PublicBaseURL, req.BaseURL)
+	out = pluginapi.AuthLoginStartResponse{
+		Provider:  credentialProvider,
+		URL:       base + resourcePrefix + "/imported.html",
+		State:     state,
+		ExpiresAt: expires.UTC(),
+		Metadata: map[string]any{
+			"source": "desktop-import",
+			"label":  authData.Label,
+		},
+	}
+	return out, nil
 }

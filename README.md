@@ -147,14 +147,19 @@ account has no subscription windows (free account) the plugin falls back to a
 local request-based estimate and labels it as such.
 
 If the QR sign-in attached a different account than the one you use in the
-desktop client, import the desktop session instead:
+desktop client, pick the **豆包（桌面端导入）** sign-in entry instead. The plugin
+reads the local Doubao desktop cookie store (DPAPI + AES-GCM), writes a
+`doubao` credential for that account, and returns immediately — no QR needed.
+
+The same import is available headless:
 
 ```bash
 python scripts/import_doubao_desktop.py --auth-dir <cpa-auth-dir>
 ```
 
-The helper decrypts the desktop cookie store (DPAPI + AES-GCM) and writes a
-`doubao` credential for the account the desktop client is signed into.
+Both paths work for free and subscribed accounts; the quota card simply shows
+the account's real windows when they exist, and a labeled local estimate when
+they do not.
 
 These commerce endpoints accept the session cookies directly and do **not**
 require the chat request signature. Chat requests still need the `a_bogus`
@@ -209,6 +214,7 @@ This project is unofficial and is not affiliated with, endorsed by, or
 sponsored by ByteDance. "Doubao" and "豆包" are trademarks of their respective
 owners. You are responsible for complying with the vendor's terms and for any
 consequences of using your account session through this plugin.
+
 
 
 
