@@ -135,7 +135,14 @@ to the network.
 
 Token counts are estimates because Doubao's web endpoints do not return usage.
 
-## 6. Troubleshooting
+## 6. Quota card
+
+The panel's quota card for a `doubao` credential is a local estimate computed
+from request telemetry (5h / 7d rolling windows). `resetTime` marks when the
+oldest request in each window ages out. There is no vendor reset API, so the
+reset action is intentionally unsupported.
+
+## 7. Troubleshooting
 
 | Symptom | Meaning | Action |
 | --- | --- | --- |
@@ -153,4 +160,5 @@ Token counts are estimates because Doubao's web endpoints do not return usage.
 - The plugin never logs request bodies or cookies.
 - The external signer receives URLs and bodies. Run it on the same machine and
   keep it bound to loopback.
+
 

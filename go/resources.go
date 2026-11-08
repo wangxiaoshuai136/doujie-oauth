@@ -61,4 +61,3 @@ func handleManagementResource(req pluginapi.ManagementRequest) (pluginapi.Manage
 		Body: append([]byte(nil), body...),
 	}, nil
 }
-

@@ -131,6 +131,22 @@ the plugin keeps its own cookies. A signer that drives a real browser page and
 lets the page's own request hook compute `a_bogus` is the most reliable option.
 See [docs/USAGE.md](docs/USAGE.md).
 
+## Quota display
+
+Doubao does not expose a public quota endpoint, so the plugin renders a
+**local estimate** card instead: it records every chat request and rate-limit
+failure in two rolling windows (5 hours / 7 days) and reports
+
+- `5h` / `7d` buckets with a remaining-fraction estimate (soft limits of five
+  requests per 5h and thirty per 7d, reduced further by failures),
+- a `resetTime` derived from the oldest request still inside each window
+  (window start + 5h / + 7d),
+- summary metrics for request counts and failures.
+
+The card updates as you chat through CPA. It is an estimate of your account's
+soft limits, not an authoritative number; Doubao's real counters live
+server-side and may differ.
+
 ## Limitations
 
 - Text-only in this version. Image, file and tool-use blocks are noted in the
@@ -181,5 +197,6 @@ This project is unofficial and is not affiliated with, endorsed by, or
 sponsored by ByteDance. "Doubao" and "豆包" are trademarks of their respective
 owners. You are responsible for complying with the vendor's terms and for any
 consequences of using your account session through this plugin.
+
 
 

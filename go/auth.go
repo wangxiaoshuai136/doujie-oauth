@@ -436,4 +436,3 @@ func loadQRImage(sender httpSender, candidates ...string) ([]byte, error) {
 	}
 	return nil, errors.New("Doubao login QR code has no image")
 }
-

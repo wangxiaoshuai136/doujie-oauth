@@ -48,13 +48,15 @@ func execute(req pluginapi.ExecutorRequest, sender httpSender) (pluginapi.Execut
 		return pluginapi.ExecutorResponse{}, upstreamError(resp.StatusCode, resp.Body)
 	}
 	var text, think string
+	var collectErr error
 	if plan.Endpoint == "chat" {
-		text, think, err = collectDoubaoChat(resp.Body)
+		text, think, collectErr = collectDoubaoChat(resp.Body)
 	} else {
-		text, think, err = collectDoubao(resp.Body)
+		text, think, collectErr = collectDoubao(resp.Body)
 	}
-	if err != nil {
-		return pluginapi.ExecutorResponse{}, pluginabi.NewError("upstream_error", err.Error(), 502)
+	usageEvents.record(req.AuthID, collectErr != nil)
+	if collectErr != nil {
+		return pluginapi.ExecutorResponse{}, pluginabi.NewError("upstream_error", collectErr.Error(), 502)
 	}
 	return pluginapi.ExecutorResponse{
 		Payload: encodeMessage(plan.Format, plan.Model, text, think),
@@ -94,14 +96,15 @@ func executeStream(req pluginapi.ExecutorRequest, callbackID, streamID string, s
 		}
 		return nil, upstreamError(response.StatusCode, raw)
 	}
-	go forwardDoubao(response.StreamID, streamID, plan.Model, plan.Format, plan.Endpoint, dataFramedChunks(req), release)
+	go forwardDoubao(response.StreamID, streamID, req.AuthID, plan.Model, plan.Format, plan.Endpoint, dataFramedChunks(req), release)
 	return map[string]any{"headers": http.Header{"Content-Type": {"text/event-stream"}, "Cache-Control": {"no-cache"}}}, nil
 }
 
-func forwardDoubao(source, target, model, format, endpoint string, dataOnly bool, release func()) {
+func forwardDoubao(source, target, authID, model, format, endpoint string, dataOnly bool, release func()) {
 	defer release()
 	defer closeHostStream(source)
 	stream := newStreamEncoder(format, model, dataOnly)
+	streamError := ""
 	inThinking := false
 	parse := func(payload []byte) (doubaoMessage, bool) {
 		if endpoint == "chat" {
@@ -129,6 +132,7 @@ func forwardDoubao(source, target, model, format, endpoint string, dataOnly bool
 	for !finished {
 		chunk, err := readHostStream(source)
 		if err != nil {
+			usageEvents.record(authID, true)
 			closeStream(target, "Doubao upstream stream failed")
 			return
 		}
@@ -154,7 +158,8 @@ func forwardDoubao(source, target, model, format, endpoint string, dataOnly bool
 				continue
 			}
 			if msg.Failure != "" {
-				closeStream(target, sanitizeUpstream(msg.Failure))
+				streamError = sanitizeUpstream(msg.Failure)
+				closeStream(target, streamError)
 				return
 			}
 			if !emit(stream.Handle(msg)) {
@@ -172,7 +177,8 @@ func forwardDoubao(source, target, model, format, endpoint string, dataOnly bool
 	if payload := sseData(string(pending)); payload != "" {
 		if msg, ok := parse([]byte(payload)); ok {
 			if msg.Failure != "" {
-				closeStream(target, sanitizeUpstream(msg.Failure))
+				streamError = sanitizeUpstream(msg.Failure)
+				closeStream(target, streamError)
 				return
 			}
 			if !emit(stream.Handle(msg)) {
@@ -181,6 +187,12 @@ func forwardDoubao(source, target, model, format, endpoint string, dataOnly bool
 			}
 		}
 	}
+	if streamError != "" {
+		usageEvents.record(authID, true)
+		closeStream(target, streamError)
+		return
+	}
+	usageEvents.record(authID, false)
 	if !emit(stream.Finish()) {
 		closeStream(target, "downstream closed")
 		return

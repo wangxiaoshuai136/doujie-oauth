@@ -63,6 +63,7 @@ func registration() any {
 		},
 		"capabilities": map[string]any{
 			"auth_provider":           true,
+			"quota_provider":          true,
 			"model_provider":          true,
 			"executor":                true,
 			"executor_model_scope":    "oauth",
@@ -99,7 +100,7 @@ func handleMethod(method string, raw []byte) (any, error) {
 				"logo":       resourceAssetURL("doubao.png"),
 			}},
 		}, nil
-	case "executor.identifier", "quota.identifier", "model.identifier":
+	case "executor.identifier", "model.identifier":
 		return map[string]string{"identifier": credentialProvider}, nil
 	case "auth.parse":
 		var req pluginapi.AuthParseRequest
@@ -168,9 +169,21 @@ func handleMethod(method string, raw []byte) (any, error) {
 			return nil, err
 		}
 		return executeStream(req.ExecutorRequest, req.CallbackID, req.StreamID, cpaSender{callbackID: req.CallbackID})
+	case "quota.identifier":
+		return map[string]string{"identifier": credentialProvider}, nil
+	case "quota.describe":
+		return quotaDescription(), nil
+	case "quota.fetch":
+		var req pluginapi.QuotaFetchRequest
+		if err := unmarshal(raw, &req); err != nil {
+			return nil, err
+		}
+		return quotaFetch(req)
+	case "quota.reset":
+		return nil, pluginabi.NewError("not_supported", "Doubao rolling windows cannot be reset", http.StatusBadRequest)
 	case "executor.count_tokens":
 		return nil, pluginabi.NewError("not_supported", "Doubao does not provide a verified token-count endpoint", http.StatusNotImplemented)
-	case "executor.http_request", "quota.fetch", "quota.reset":
+	case "executor.http_request":
 		return nil, pluginabi.NewError("not_supported", "unsupported plugin method", http.StatusNotImplemented)
 	default:
 		return nil, pluginabi.NewError("unknown_method", "unknown plugin method", http.StatusNotImplemented)
