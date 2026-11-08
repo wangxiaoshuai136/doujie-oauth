@@ -28,6 +28,9 @@ type flexNumber float64
 
 func (f *flexNumber) UnmarshalJSON(raw []byte) error {
 	text := strings.Trim(strings.TrimSpace(string(raw)), `"`)
+	text = strings.ReplaceAll(text, ",", "")
+	text = strings.ReplaceAll(text, "，", "")
+	text = strings.TrimSpace(text)
 	if text == "" || text == "null" {
 		*f = 0
 		return nil
@@ -347,11 +350,8 @@ func mergeQuotaAPI(req pluginapi.QuotaFetchRequest, sender httpSender, local plu
 			buckets = bucketsFromSection(summary.Data.IncentiveQuotaSection)
 		}
 		if len(buckets) > 0 {
-			groups := []pluginapi.QuotaGroup{{DisplayName: "豆包订阅额度", Buckets: buckets}}
-			if len(local.Groups) > 0 {
-				groups = append(groups, local.Groups...)
-			}
-			local.Groups = groups
+			local.Groups = []pluginapi.QuotaGroup{{DisplayName: "豆包订阅额度", Buckets: buckets}}
+			local.Summary = nil
 		}
 		if summary.Data.MemberInfo.HasActiveSubscription || summary.Data.CurrentSubscription.Status != 0 {
 			plan := firstNonEmpty(summary.Data.CurrentSubscription.Display.ProductName, summary.Data.CurrentSubscription.SkuKey)

@@ -154,7 +154,34 @@ signs chat traffic with `a_bogus`, but the commerce endpoints do not require it.
 If the account has no subscription windows, the card is labeled as a local
 request-based estimate.
 
-## 7. Troubleshooting
+## 7. Importing the desktop session
+
+QR sign-in can attach the wrong account if the phone app is signed in with a
+different profile than the desktop client. The plugin ships a Windows helper
+that imports the desktop client's session directly:
+
+```bash
+python scripts/import_doubao_desktop.py \
+  --auth-dir "D:/path/to/cpa/oauth" \
+  --user-data "C:/Users/<you>/AppData/Local/Doubao/User Data"
+```
+
+It reads the desktop `Cookies` store, decrypts the `v10` values with the
+DPAPI-protected key from `Local State`, backs up existing `doubao-*.json` files
+to `oauth-backup/`, and writes a fresh credential. Restart the CPA core
+afterwards. Requires `cryptography`.
+
+Verify the account with:
+
+```bash
+curl -s -X POST "http://127.0.0.1:8317/v0/management/quota/fetch" \
+  -H "Authorization: Bearer <secret>" -H "Content-Type: application/json" \
+  -d '{"auth_index":"<index>"}'
+```
+
+`subscription.plan` and the `7d` bucket should match the desktop account.
+
+## 8. Troubleshooting
 
 | Symptom | Meaning | Action |
 | --- | --- | --- |
@@ -172,6 +199,7 @@ request-based estimate.
 - The plugin never logs request bodies or cookies.
 - The external signer receives URLs and bodies. Run it on the same machine and
   keep it bound to loopback.
+
 
 
 
