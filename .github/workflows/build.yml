@@ -76,8 +76,9 @@ jobs:
           set -euo pipefail
           cd dist
           archive="${PLUGIN_ID}_${VERSION}_${{ matrix.goos }}_${{ matrix.goarch }}.zip"
-          zip -r "$archive" "${PLUGIN_ID}.${{ matrix.ext }}" ../README.md ../README.zh-CN.md ../LICENSE
-          python3 -c "import hashlib,sys; p=sys.argv[1]; print(hashlib.sha256(open(p,'rb').read()).hexdigest()+'  '+p)" "$archive" > "$archive.sha256"
+          if command -v python3 >/dev/null 2>&1; then PY=python3; else PY=python; fi
+          "$PY" -c "import sys, zipfile; z=zipfile.ZipFile(sys.argv[1], 'w', zipfile.ZIP_DEFLATED); [z.write(p, p.split('/')[-1]) for p in sys.argv[2:]]; z.close()" "$archive" "${PLUGIN_ID}.${{ matrix.ext }}" ../README.md ../README.zh-CN.md ../LICENSE
+          "$PY" -c "import hashlib,sys; p=sys.argv[1]; print(hashlib.sha256(open(p,'rb').read()).hexdigest()+'  '+p)" "$archive" > "$archive.sha256"
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ env.PLUGIN_ID }}_${{ matrix.goos }}_${{ matrix.goarch }}
@@ -107,3 +108,4 @@ jobs:
             dist/*.zip
             dist/*.zip.sha256
           generate_release_notes: true
+
