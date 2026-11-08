@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/paul19910215-sketch/omc-doubao-oauth/actions/workflows/build.yml"><img src="https://github.com/paul19910215-sketch/omc-doubao-oauth/actions/workflows/build.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/wangxiaoshuai136/omc-doubao-oauth/actions/workflows/build.yml"><img src="https://github.com/wangxiaoshuai136/omc-doubao-oauth/actions/workflows/build.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/CLIProxyAPI-v8+-4f46e5" alt="CLIProxyAPI v8+">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license">
 </p>
@@ -214,6 +214,7 @@ This project is unofficial and is not affiliated with, endorsed by, or
 sponsored by ByteDance. "Doubao" and "豆包" are trademarks of their respective
 owners. You are responsible for complying with the vendor's terms and for any
 consequences of using your account session through this plugin.
+
 
 
 

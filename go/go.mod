@@ -1,4 +1,4 @@
-module github.com/paul19910215-sketch/omc-doubao-oauth
+module github.com/wangxiaoshuai136/omc-doubao-oauth
 
 go 1.27.0
 
@@ -19,3 +19,4 @@ require (
 	modernc.org/memory v1.12.1 // indirect
 	modernc.org/sqlite v1.62.0 // indirect
 )
+

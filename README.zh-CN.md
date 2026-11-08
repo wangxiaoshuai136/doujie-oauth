@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/paul19910215-sketch/omc-doubao-oauth/actions/workflows/build.yml"><img src="https://github.com/paul19910215-sketch/omc-doubao-oauth/actions/workflows/build.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/wangxiaoshuai136/omc-doubao-oauth/actions/workflows/build.yml"><img src="https://github.com/wangxiaoshuai136/omc-doubao-oauth/actions/workflows/build.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/CLIProxyAPI-v8+-4f46e5" alt="CLIProxyAPI v8+">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license">
 </p>
@@ -180,6 +180,7 @@ MIT，见 [LICENSE](LICENSE)。
 本项目为非官方项目，与字节跳动无隶属、背书或赞助关系。"豆包""Doubao"
 是其各自权利人的商标。使用账号登录态接入本插件时，请自行确认并遵守厂商
 服务条款，自行承担由此产生的后果。
+
 
 
 

@@ -9,7 +9,7 @@ import (
 
 const pluginStoreID = "omc-doubao-oauth"
 const resourcePrefix = "/v0/resource/plugins/" + pluginStoreID
-const publicLogoBaseURL = "https://raw.githubusercontent.com/paul19910215-sketch/omc-doubao-oauth/refs/heads/main/assets/"
+const publicLogoBaseURL = "https://raw.githubusercontent.com/wangxiaoshuai136/omc-doubao-oauth/refs/heads/main/assets/"
 
 func resourceAssetURL(name string) string {
 	switch name {
@@ -73,3 +73,4 @@ const desktopImportedPage = `<!doctype html>
 <body><main><h1>已从豆包桌面端导入账号</h1>
 <p>插件已读取本机豆包桌面客户端的登录态并写入 CPA。可以关闭此页，回到面板查看额度卡。</p>
 <p>如果没有看到账号，请确认桌面客户端已登录后重新点击该入口。</p></main></body></html>`
+

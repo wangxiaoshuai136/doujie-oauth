@@ -57,8 +57,8 @@ func registration() any {
 		"metadata": pluginapi.Metadata{
 			Name:             "OMC Doubao OAuth",
 			Version:          pluginVersion,
-			Author:           "paul19910215-sketch",
-			GitHubRepository: "https://github.com/paul19910215-sketch/omc-doubao-oauth",
+			Author:           "wangxiaoshuai136",
+			GitHubRepository: "https://github.com/wangxiaoshuai136/omc-doubao-oauth",
 			Logo:             resourceAssetURL("logo.png"),
 			ConfigFields: []pluginapi.ConfigField{
 				{Name: "max_concurrency", Type: pluginapi.ConfigFieldTypeInteger, Description: "Maximum simultaneous requests per credential (default 3)."},
@@ -207,3 +207,4 @@ func handleMethod(method string, raw []byte) (any, error) {
 		return nil, pluginabi.NewError("unknown_method", "unknown plugin method", http.StatusNotImplemented)
 	}
 }
+
