@@ -106,7 +106,7 @@ func handleMethod(method string, raw []byte) (any, error) {
 			"credential_providers": []string{credentialProvider},
 			"entries": []map[string]any{
 				{"identifier": entryID, "name": "豆姐（国内版）", "logo": resourceAssetURL("doubao.png")},
-				{"identifier": internationalEntryID, "name": "豆姐国际版（Dola）", "logo": resourceAssetURL("doubao.png")},
+				{"identifier": internationalEntryID, "name": "豆姐国际版（Dola）", "logo": resourceAssetURL("dola.png")},
 				{"identifier": desktopEntryID, "name": "豆姐（桌面端导入）", "logo": resourceAssetURL("doubao.png")},
 			},
 		}, nil
@@ -145,7 +145,8 @@ func handleMethod(method string, raw []byte) (any, error) {
 			{"path": "/logo.png", "menu": "", "description": "Plugin logo."},
 			{"path": "/qr.png", "menu": "", "description": "Login QR code for the latest sign-in flow."},
 			{"path": "/imported.html", "menu": "", "description": "Desktop import result page."},
-			{"path": "/doubao.png", "menu": "", "description": "Provider sign-in logo."},
+			{"path": "/doubao.png", "menu": "", "description": "Domestic sign-in logo."},
+			{"path": "/dola.png", "menu": "", "description": "International sign-in logo."},
 			{"path": "/omc.json", "menu": "", "description": "Public, optional OMC plugin declaration."},
 		}}, nil
 	case "management.handle":

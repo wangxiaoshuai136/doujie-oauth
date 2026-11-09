@@ -13,7 +13,7 @@ const publicLogoBaseURL = "https://raw.githubusercontent.com/wangxiaoshuai136/om
 
 func resourceAssetURL(name string) string {
 	switch name {
-	case "logo.png", "doubao.png":
+	case "logo.png", "doubao.png", "dola.png":
 		return publicLogoBaseURL + name
 	default:
 		return ""
@@ -22,6 +22,12 @@ func resourceAssetURL(name string) string {
 
 //go:embed assets/logo.png
 var logoPNG []byte
+
+//go:embed assets/doubao.png
+var doubaoPNG []byte
+
+//go:embed assets/dola.png
+var dolaPNG []byte
 
 func handleManagementResource(req pluginapi.ManagementRequest) (pluginapi.ManagementResponse, error) {
 	if req.Method != http.MethodGet {
@@ -35,8 +41,12 @@ func handleManagementResource(req pluginapi.ManagementRequest) (pluginapi.Manage
 	cacheControl := "public, max-age=86400"
 	var body []byte
 	switch {
-	case req.Path == resourcePrefix+"/logo.png" || req.Path == resourcePrefix+"/doubao.png":
+	case req.Path == resourcePrefix+"/logo.png":
 		body = logoPNG
+	case req.Path == resourcePrefix+"/doubao.png":
+		body = doubaoPNG
+	case req.Path == resourcePrefix+"/dola.png":
+		body = dolaPNG
 	case req.Path == omcResourcePath:
 		body = []byte(omcDescriptorJSON)
 		contentType = "application/json; charset=utf-8"

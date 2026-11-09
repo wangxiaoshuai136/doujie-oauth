@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 	"time"
@@ -26,7 +27,7 @@ func TestManagementServesQRCode(t *testing.T) {
 }
 
 func TestManagementServesLogoAndDescriptor(t *testing.T) {
-	for _, path := range []string{resourcePrefix + "/logo.png", omcResourcePath} {
+	for _, path := range []string{resourcePrefix + "/logo.png", resourcePrefix + "/doubao.png", resourcePrefix + "/dola.png", omcResourcePath} {
 		resp, err := handleManagementResource(pluginapi.ManagementRequest{Method: "GET", Path: path})
 		if err != nil {
 			t.Fatal(err)
@@ -34,6 +35,11 @@ func TestManagementServesLogoAndDescriptor(t *testing.T) {
 		if resp.StatusCode != 200 || len(resp.Body) == 0 {
 			t.Fatalf("unexpected response for %s: %d", path, resp.StatusCode)
 		}
+	}
+	doubao, _ := handleManagementResource(pluginapi.ManagementRequest{Method: "GET", Path: resourcePrefix + "/doubao.png"})
+	dola, _ := handleManagementResource(pluginapi.ManagementRequest{Method: "GET", Path: resourcePrefix + "/dola.png"})
+	if bytes.Equal(doubao.Body, dola.Body) {
+		t.Fatal("domestic and international entry icons must be distinct")
 	}
 	resp, _ := handleManagementResource(pluginapi.ManagementRequest{Method: "POST", Path: resourcePrefix + "/logo.png"})
 	if resp.StatusCode != 405 {
