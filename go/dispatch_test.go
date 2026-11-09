@@ -16,12 +16,13 @@ func TestAuthIdentifiersDoNotExposeLegacyAliases(t *testing.T) {
 		t.Fatalf("unexpected identifiers: %#v", payload["identifiers"])
 	}
 	for _, identifier := range identifiers {
-		if identifier == browserEntryID || identifier == dolaBrowserEntryID {
-			t.Fatalf("legacy alias exposed in entry picker: %s", identifier)
+		switch identifier {
+		case browserEntryID, dolaBrowserEntryID, domesticQREntryID, internationalQREntryID, desktopEntryID:
+			t.Fatalf("hidden compatibility provider exposed in entry picker: %s", identifier)
 		}
 	}
 	entries, ok := payload["entries"].([]map[string]any)
-	if !ok || len(entries) != 5 {
+	if !ok || len(entries) != 2 {
 		t.Fatalf("unexpected entries: %#v", payload["entries"])
 	}
 }

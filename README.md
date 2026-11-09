@@ -43,9 +43,10 @@ instead of switching regions automatically by IP or browser language.
 | --- | --- | --- |
 | Doujie (domestic) | `doubao` | Default domestic entry: opens the system browser for account/SMS sign-in |
 | Doujie international (Dola) | `dola` | Default international entry: opens the system browser for Dola sign-in |
-| Doujie domestic QR | `doubao-qr` | Explicit domestic QR entry; uses `assets/doubao.png` |
-| Doujie international QR | `dola-qr` | Explicit Dola QR entry; uses `assets/dola.png` |
-| Doujie desktop import | `doubao-desktop` | Windows local session import; produces a domestic credential |
+
+Only the two primary entries are shown in the login picker. QR and desktop
+import provider identifiers remain accepted internally for older clients, but
+they are no longer advertised as separate cards.
 
 QR scanning is optional. The desktop entry imports the local session without a
 phone. If Doubao is running and holds its cookie database open, the plugin opens

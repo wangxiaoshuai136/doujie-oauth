@@ -8,7 +8,7 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
 )
 
-var pluginVersion = "0.1.8"
+var pluginVersion = "0.1.9"
 
 type rpcAuthStart struct {
 	pluginapi.AuthLoginStartRequest
@@ -103,14 +103,11 @@ func handleMethod(method string, raw []byte) (any, error) {
 	case "auth.identifier":
 		return map[string]any{
 			"identifier":           entryID,
-			"identifiers":          []string{entryID, internationalEntryID, domesticQREntryID, internationalQREntryID, desktopEntryID},
+			"identifiers":          []string{entryID, internationalEntryID},
 			"credential_providers": []string{credentialProvider},
 			"entries": []map[string]any{
 				{"identifier": entryID, "name": "豆姐（国内版）", "logo": resourceAssetURL("doubao.png")},
 				{"identifier": internationalEntryID, "name": "豆姐国际版（Dola）", "logo": resourceAssetURL("dola.png")},
-				{"identifier": domesticQREntryID, "name": "豆姐（国内版·扫码）", "logo": resourceAssetURL("doubao.png")},
-				{"identifier": internationalQREntryID, "name": "豆姐国际版（Dola·扫码）", "logo": resourceAssetURL("dola.png")},
-				{"identifier": desktopEntryID, "name": "豆姐（桌面端导入）", "logo": resourceAssetURL("doubao.png")},
 			},
 		}, nil
 	case "executor.identifier", "model.identifier":
