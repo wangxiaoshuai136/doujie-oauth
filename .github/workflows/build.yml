@@ -60,7 +60,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          version="0.1.7"
+          version="0.1.8"
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             version="${GITHUB_REF_NAME#v}"
           fi

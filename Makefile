@@ -1,5 +1,5 @@
 PLUGIN_ID ?= doujie-oauth
-VERSION ?= 0.1.7
+VERSION ?= 0.1.8
 GOOS ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)
 EXT = $(if $(filter darwin,$(GOOS)),dylib,$(if $(filter windows,$(GOOS)),dll,so))
