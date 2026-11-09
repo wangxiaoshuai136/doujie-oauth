@@ -27,6 +27,29 @@ func TestManagementServesQRCode(t *testing.T) {
 	}
 }
 
+func TestManagementServesQRCodeByFlowToken(t *testing.T) {
+	firstID := strings.Repeat("d", 32)
+	secondID := strings.Repeat("e", 32)
+	first := &loginFlow{Expires: time.Now().Add(time.Minute), QRPNG: []byte("FIRST"), QRToken: "first-token"}
+	second := &loginFlow{Expires: time.Now().Add(time.Minute), QRPNG: []byte("SECOND"), QRToken: "second-token"}
+	putFlow(firstID, first)
+	putFlow(secondID, second)
+	defer takeFlow(firstID)
+	defer takeFlow(secondID)
+
+	resp, err := handleManagementResource(pluginapi.ManagementRequest{
+		Method: "GET",
+		Path:   resourcePrefix + "/qr.png",
+		Query:  url.Values{"flow": {"first-token"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != 200 || string(resp.Body) != "FIRST" {
+		t.Fatalf("flow QR response: %d %q", resp.StatusCode, resp.Body)
+	}
+}
+
 func TestManagementServesLogoAndDescriptor(t *testing.T) {
 	for _, path := range []string{resourcePrefix + "/logo.png", resourcePrefix + "/doubao.png", resourcePrefix + "/dola.png", resourcePrefix + "/account.html", descriptorResourcePath} {
 		resp, err := handleManagementResource(pluginapi.ManagementRequest{Method: "GET", Path: path})

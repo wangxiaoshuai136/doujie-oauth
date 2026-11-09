@@ -48,6 +48,9 @@ python scripts/import_doubao_desktop.py --auth-dir "path/to/cpa/oauth"
 
 ### Option B: Mobile QR Sign-In
 
+The main `doubao` and `dola` entries use browser account sign-in. Use the explicit
+`doubao-qr` or `dola-qr` entries when you want the mobile QR flow.
+
 The plugin does not auto-detect regions. Choose either **豆姐（国内版）** or **豆姐国际版（Dola）** explicitly in the panel. The international entry uses `dola.com` and is subject to the upstream regional policy; it is optional and does not change the default domestic account.
 
 1. Open the panel's plugin / OAuth page and select the desired entry.
@@ -58,14 +61,14 @@ The plugin does not auto-detect regions. Choose either **豆姐（国内版）**
 
 ### Option C: Browser Account Sign-In (No QR)
 
-Choose **豆姐（账号登录）**. The plugin opens a visible Edge/Chrome window with
-an isolated profile and the Doubao login page. Enter the phone number, password
-or SMS code there. A loopback-only DevTools connection reads the resulting
-Doubao cookies; the plugin never receives or stores the password. The browser
-and temporary profile are closed after success or expiry.
+Choose **豆姐（国内版）** or **豆姐国际版（Dola）**. The plugin opens the system
+default Chromium browser in an isolated profile and the matching login page.
+Enter the phone number, password or SMS code there. A loopback-only DevTools
+connection reads the resulting cookies; the plugin never receives or stores the
+password. The browser and temporary profile are closed after success or expiry.
 
-This mode requires a desktop Windows session and Microsoft Edge or Google
-Chrome. Set `DOUJIE_BROWSER_PATH` if the browser is installed in a non-standard
+This mode requires a desktop Windows session and a Chromium-compatible default
+browser. Set `DOUJIE_BROWSER_PATH` if the browser is installed in a non-standard
 location.
 
 ### Session Lifetime

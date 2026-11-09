@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -21,10 +22,10 @@ import (
 
 	"github.com/gorilla/websocket"
 	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/registry"
 )
 
 const (
-	browserLoginURL            = "https://www.doubao.com/chat/"
 	browserLoginTempPrefix     = "doujie-browser-"
 	browserLoginHTTPTimeout    = 5 * time.Second
 	browserLoginCommandTimeout = 8 * time.Second
@@ -36,6 +37,7 @@ type browserLogin struct {
 	Port        int
 	UserDataDir string
 	PID         int
+	Site        string
 	WSURL       string
 	client      *cdpClient
 	mu          sync.Mutex
@@ -78,11 +80,12 @@ type cdpError struct {
 	Code int `json:"code"`
 }
 
-// startBrowserLogin launches a visible Edge/Chrome instance with an isolated
-// profile and a loopback-only DevTools endpoint. When running as a service in
-// session 0 it duplicates the active console user's token as a primary token
-// so the browser appears on that user's desktop.
-func startBrowserLogin() (*browserLogin, error) {
+// startBrowserLogin launches the user's default Chromium browser with an
+// isolated profile and a loopback-only DevTools endpoint. When running as a
+// service in session 0 it uses the active console user's profile and token so
+// both the default-browser choice and the window belong to that user.
+func startBrowserLogin(site string) (*browserLogin, error) {
+	site = normalizeSite(site)
 	port, err := freeLoopbackPort()
 	if err != nil {
 		return nil, err
@@ -90,12 +93,18 @@ func startBrowserLogin() (*browserLogin, error) {
 
 	var launchToken windows.Token
 	var profile string
+	var browserPath string
 	if processRunsInSessionZero() {
 		consoleToken, consoleProfile, err := activeConsoleUser()
 		if err != nil {
 			return nil, fmt.Errorf("locate the active desktop user: %w", err)
 		}
 		profile = consoleProfile
+		browserPath, err = resolveBrowserExecutableForUser(profile, consoleToken)
+		if err != nil {
+			consoleToken.Close()
+			return nil, fmt.Errorf("resolve the desktop user's default browser: %w", err)
+		}
 		launchToken, err = duplicatePrimaryToken(consoleToken)
 		consoleToken.Close()
 		if err != nil {
@@ -104,6 +113,10 @@ func startBrowserLogin() (*browserLogin, error) {
 		defer launchToken.Close()
 	} else {
 		profile, err = currentUserProfile()
+		if err != nil {
+			return nil, err
+		}
+		browserPath, err = resolveBrowserExecutable(profile)
 		if err != nil {
 			return nil, err
 		}
@@ -120,11 +133,6 @@ func startBrowserLogin() (*browserLogin, error) {
 		}
 	}()
 
-	browserPath, err := resolveBrowserExecutable(profile)
-	if err != nil {
-		return nil, err
-	}
-
 	args := []string{
 		fmt.Sprintf("--remote-debugging-port=%d", port),
 		"--remote-allow-origins=*",
@@ -132,7 +140,7 @@ func startBrowserLogin() (*browserLogin, error) {
 		"--no-first-run",
 		"--no-default-browser-check",
 		"--new-window",
-		browserLoginURL,
+		profileForSite(site).Root + "/chat/",
 	}
 	cmd := exec.Command(browserPath, args...)
 	cmd.Env = browserEnvironment(profile)
@@ -151,6 +159,7 @@ func startBrowserLogin() (*browserLogin, error) {
 		Port:        port,
 		UserDataDir: userDataDir,
 		PID:         cmd.Process.Pid,
+		Site:        site,
 		process:     cmd.Process,
 	}, nil
 }
@@ -191,7 +200,7 @@ func (b *browserLogin) PollCookies() (map[string]string, error) {
 		b.WSURL = ""
 		return nil, err
 	}
-	result := cookieMapFromCDP(cookies)
+	result := cookieMapFromCDP(cookies, b.Site)
 	if result["sessionid"] == "" {
 		return map[string]string{}, nil
 	}
@@ -256,7 +265,7 @@ func (b *browserLogin) findPageTarget() (devToolsTarget, error) {
 	if err := json.NewDecoder(response.Body).Decode(&targets); err != nil {
 		return devToolsTarget{}, errors.New("decode browser targets: invalid response")
 	}
-	target, ok := pickPageTarget(targets, b.Port)
+	target, ok := pickPageTarget(targets, b.Port, b.Site)
 	if !ok {
 		return devToolsTarget{}, errors.New("browser login page is not ready")
 	}
@@ -345,8 +354,8 @@ func dialCDP(wsURL string) (*cdpClient, error) {
 	return &cdpClient{conn: conn}, nil
 }
 
-func pickPageTarget(targets []devToolsTarget, port int) (devToolsTarget, bool) {
-	var doubaoChat, doubaoAny, fallback *devToolsTarget
+func pickPageTarget(targets []devToolsTarget, port int, site string) (devToolsTarget, bool) {
+	var siteChat, siteAny, fallback *devToolsTarget
 	for i := range targets {
 		target := &targets[i]
 		if target.Type != "page" || target.WebSocketDebuggerURL == "" {
@@ -359,21 +368,31 @@ func pickPageTarget(targets []devToolsTarget, port int) (devToolsTarget, bool) {
 			fallback = target
 		}
 		host, path := targetURLParts(target.URL)
-		if host == "doubao.com" || strings.HasSuffix(host, ".doubao.com") {
-			if doubaoAny == nil {
-				doubaoAny = target
+		if hostMatchesSite(host, site) {
+			if siteAny == nil {
+				siteAny = target
 			}
-			if strings.HasPrefix(path, "/chat") && doubaoChat == nil {
-				doubaoChat = target
+			if strings.HasPrefix(path, "/chat") && siteChat == nil {
+				siteChat = target
 			}
 		}
 	}
-	for _, target := range []*devToolsTarget{doubaoChat, doubaoAny, fallback} {
+	for _, target := range []*devToolsTarget{siteChat, siteAny, fallback} {
 		if target != nil {
 			return *target, true
 		}
 	}
 	return devToolsTarget{}, false
+}
+
+func hostMatchesSite(host, site string) bool {
+	host = strings.ToLower(strings.TrimSpace(host))
+	root, err := url.Parse(profileForSite(site).Root)
+	if err != nil {
+		return false
+	}
+	base := strings.TrimPrefix(strings.ToLower(root.Hostname()), "www.")
+	return host == base || strings.HasSuffix(host, "."+base)
 }
 
 func targetURLParts(raw string) (string, string) {
@@ -393,9 +412,9 @@ func devToolsWSURLForPort(raw string, port int) bool {
 	return host == "127.0.0.1" || host == "localhost" || host == "::1"
 }
 
-// cookieMapFromCDP keeps only Doubao/ByteDance cookies and returns an empty map
-// until the session cookie appears.
-func cookieMapFromCDP(cookies []cdpCookie) map[string]string {
+// cookieMapFromCDP keeps only cookies for the selected portal and returns an
+// empty map until the session cookie appears.
+func cookieMapFromCDP(cookies []cdpCookie, site string) map[string]string {
 	result := map[string]string{}
 	best := map[string]int{}
 	for _, cookie := range cookies {
@@ -403,7 +422,7 @@ func cookieMapFromCDP(cookies []cdpCookie) map[string]string {
 		if name == "" || strings.TrimSpace(cookie.Value) == "" {
 			continue
 		}
-		if !cookieDomainAllowed(cookie.Domain) {
+		if !cookieDomainAllowed(cookie.Domain, site) {
 			continue
 		}
 		score := cookiePreference(cookie)
@@ -419,10 +438,9 @@ func cookieMapFromCDP(cookies []cdpCookie) map[string]string {
 	return result
 }
 
-func cookieDomainAllowed(domain string) bool {
+func cookieDomainAllowed(domain, site string) bool {
 	domain = normalizeCookieDomain(domain)
-	return domain == "doubao.com" ||
-		strings.HasSuffix(domain, ".doubao.com") ||
+	return hostMatchesSite(domain, site) ||
 		domain == "bytedance.com" ||
 		strings.HasSuffix(domain, ".bytedance.com")
 }
@@ -439,6 +457,8 @@ func cookiePreference(cookie cdpCookie) int {
 	score := 0
 	switch {
 	case domain == "doubao.com" || strings.HasSuffix(domain, ".doubao.com"):
+		score = 2_000_000
+	case domain == "dola.com" || strings.HasSuffix(domain, ".dola.com"):
 		score = 2_000_000
 	case domain == "bytedance.com" || strings.HasSuffix(domain, ".bytedance.com"):
 		score = 1_000_000
@@ -569,6 +589,20 @@ func mergeEnvironment(base []string, overrides map[string]string) []string {
 	return result
 }
 
+func resolveBrowserExecutableForUser(profile string, token windows.Token) (string, error) {
+	if token == 0 {
+		return resolveBrowserExecutable(profile)
+	}
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	ok, _, callErr := procImpersonateUser.Call(uintptr(token))
+	if ok == 0 {
+		return "", fmt.Errorf("ImpersonateLoggedOnUser failed: %v", callErr)
+	}
+	defer procRevertToSelf.Call()
+	return resolveBrowserExecutable(profile)
+}
+
 func resolveBrowserExecutable(profile string) (string, error) {
 	if override := strings.TrimSpace(os.Getenv("DOUJIE_BROWSER_PATH")); override != "" {
 		override = os.ExpandEnv(strings.Trim(override, `"`))
@@ -577,12 +611,65 @@ func resolveBrowserExecutable(profile string) (string, error) {
 		}
 		return "", errors.New("DOUJIE_BROWSER_PATH is not an executable file")
 	}
+	if defaultPath, defaultErr := defaultBrowserExecutable(); defaultErr == nil && isChromiumBrowser(defaultPath) && isBrowserExecutable(defaultPath) {
+		return defaultPath, nil
+	}
 	for _, candidate := range browserExecutableCandidates(profile, os.Getenv) {
 		if isBrowserExecutable(candidate) {
 			return candidate, nil
 		}
 	}
-	return "", errors.New("Microsoft Edge or Google Chrome was not found; install one or set DOUJIE_BROWSER_PATH")
+	return "", errors.New("the default browser is not Chromium-compatible; use Chrome or set DOUJIE_BROWSER_PATH")
+}
+
+func defaultBrowserExecutable() (string, error) {
+	key, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice`, registry.QUERY_VALUE)
+	if err != nil {
+		return "", err
+	}
+	progID, _, err := key.GetStringValue("ProgId")
+	_ = key.Close()
+	if err != nil || strings.TrimSpace(progID) == "" {
+		return "", errors.New("default browser association is unavailable")
+	}
+	commandKey, err := registry.OpenKey(registry.CLASSES_ROOT, progID+`\shell\open\command`, registry.QUERY_VALUE)
+	if err != nil {
+		return "", err
+	}
+	defer commandKey.Close()
+	command, _, err := commandKey.GetStringValue("")
+	if err != nil {
+		return "", err
+	}
+	return parseBrowserCommand(command)
+}
+
+func parseBrowserCommand(command string) (string, error) {
+	command = strings.TrimSpace(command)
+	if command == "" {
+		return "", errors.New("default browser command is empty")
+	}
+	if command[0] == '"' {
+		end := strings.IndexByte(command[1:], '"')
+		if end < 0 {
+			return "", errors.New("default browser command has an unterminated path")
+		}
+		return filepath.Clean(os.ExpandEnv(command[1 : end+1])), nil
+	}
+	fields := strings.Fields(command)
+	if len(fields) == 0 {
+		return "", errors.New("default browser executable is missing")
+	}
+	return filepath.Clean(os.ExpandEnv(fields[0])), nil
+}
+
+func isChromiumBrowser(path string) bool {
+	switch strings.ToLower(filepath.Base(strings.TrimSpace(path))) {
+	case "chrome.exe", "msedge.exe", "brave.exe", "vivaldi.exe", "chromium.exe", "thorium.exe":
+		return true
+	default:
+		return false
+	}
 }
 
 func browserExecutableCandidates(profile string, getenv func(string) string) []string {
@@ -604,12 +691,6 @@ func browserExecutableCandidates(profile string, getenv func(string) string) []s
 	}
 
 	var candidates []string
-	for _, dir := range programDirs {
-		candidates = append(candidates, filepath.Join(dir, "Microsoft", "Edge", "Application", "msedge.exe"))
-	}
-	for _, dir := range localDirs {
-		candidates = append(candidates, filepath.Join(dir, "Microsoft", "Edge", "Application", "msedge.exe"))
-	}
 	for _, dir := range programDirs {
 		candidates = append(candidates, filepath.Join(dir, "Google", "Chrome", "Application", "chrome.exe"))
 	}

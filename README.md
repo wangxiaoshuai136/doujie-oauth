@@ -41,19 +41,21 @@ instead of switching regions automatically by IP or browser language.
 
 | Portal | Entry | Notes |
 | --- | --- | --- |
-| Doujie (domestic) | `doubao` | Default domestic site; uses `assets/doubao.png` |
-| Doujie international (Dola) | `dola` | Independent international site; uses `assets/dola.png`; subject to upstream regional policy |
+| Doujie (domestic) | `doubao` | Default domestic entry: opens the system browser for account/SMS sign-in |
+| Doujie international (Dola) | `dola` | Default international entry: opens the system browser for Dola sign-in |
+| Doujie domestic QR | `doubao-qr` | Explicit domestic QR entry; uses `assets/doubao.png` |
+| Doujie international QR | `dola-qr` | Explicit Dola QR entry; uses `assets/dola.png` |
 | Doujie desktop import | `doubao-desktop` | Windows local session import; produces a domestic credential |
-| Doujie account sign-in | `doubao-account` | Opens an isolated Edge/Chrome window for phone, password or SMS login; no QR code |
 
 QR scanning is optional. The desktop entry imports the local session without a
 phone. If Doubao is running and holds its cookie database open, the plugin opens
 a no-QR import page: quit Doubao from the tray, then retry on that page.
 
-The account entry opens a real Doubao login page in an isolated browser profile.
-Sign in there with the phone number, password or SMS code you already use; the
-plugin reads the resulting session through a loopback-only DevTools connection.
-It never stores the account password.
+The main domestic and Dola entries open the system default Chromium browser in an
+isolated profile. Sign in there with the phone number, password or SMS code you
+already use; the plugin reads the resulting session through a loopback-only
+DevTools connection. It never stores the account password. `doubao-account` is
+kept as a legacy alias for existing clients.
 
 On panels that render per-entry metadata (CPA v8.0.51+), each entry appears as
 its own card with its own name and icon. Picking an entry picks the site; the
@@ -82,7 +84,7 @@ The plugin needs no local callback listener and no separate browser process.
   auto-switching regions.
 - Windows desktop session import to avoid phone/desktop account mismatch.
 - No-QR fallback page for a locked desktop cookie database.
-- Browser-based account sign-in for phone, password or SMS login without scanning.
+- Default browser account sign-in for phone, password or SMS login without scanning.
 - Native Anthropic Messages, OpenAI Chat Completions and OpenAI Responses
   execution.
 - Deep-thinking and reasoning streaming.

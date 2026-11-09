@@ -18,7 +18,7 @@ func TestCookieMapFromCDPFiltersAndPrefersDoubao(t *testing.T) {
 		{Name: "empty", Value: "", Domain: ".doubao.com", Path: "/"},
 	}
 
-	got := cookieMapFromCDP(cookies)
+	got := cookieMapFromCDP(cookies, siteCN)
 	if got["sessionid"] != "doubao-session" {
 		t.Fatalf("sessionid = %q", got["sessionid"])
 	}
@@ -39,7 +39,7 @@ func TestCookieMapFromCDPFiltersAndPrefersDoubao(t *testing.T) {
 func TestCookieMapFromCDPRequiresSessionID(t *testing.T) {
 	got := cookieMapFromCDP([]cdpCookie{
 		{Name: "ttwid", Value: "tt", Domain: ".doubao.com", Path: "/"},
-	})
+	}, siteCN)
 	if got == nil {
 		t.Fatal("expected an empty map, got nil")
 	}
@@ -52,9 +52,30 @@ func TestCookieMapFromCDPPrefersSpecificDomain(t *testing.T) {
 	got := cookieMapFromCDP([]cdpCookie{
 		{Name: "sessionid", Value: "broad", Domain: ".doubao.com", Path: "/"},
 		{Name: "sessionid", Value: "specific", Domain: "www.doubao.com", Path: "/"},
-	})
+	}, siteCN)
 	if got["sessionid"] != "specific" {
 		t.Fatalf("sessionid = %q", got["sessionid"])
+	}
+}
+
+func TestCookieMapFromCDPIncludesDola(t *testing.T) {
+	got := cookieMapFromCDP([]cdpCookie{
+		{Name: "sessionid", Value: "doubao-session", Domain: ".doubao.com", Path: "/"},
+		{Name: "ttwid", Value: "doubao-tt", Domain: "www.doubao.com", Path: "/"},
+		{Name: "sessionid", Value: "dola-session", Domain: ".dola.com", Path: "/"},
+		{Name: "ttwid", Value: "dola-tt", Domain: "www.dola.com", Path: "/"},
+	}, siteGlobal)
+	if got["sessionid"] != "dola-session" || got["ttwid"] != "dola-tt" {
+		t.Fatalf("unexpected Dola cookies: %#v", got)
+	}
+}
+
+func TestCookieMapFromCDPKeepsPortalsSeparate(t *testing.T) {
+	got := cookieMapFromCDP([]cdpCookie{
+		{Name: "sessionid", Value: "dola-session", Domain: ".dola.com", Path: "/"},
+	}, siteCN)
+	if len(got) != 0 {
+		t.Fatalf("domestic login accepted global cookies: %#v", got)
 	}
 }
 
@@ -84,7 +105,7 @@ func TestPickPageTargetPrefersDoubaoChat(t *testing.T) {
 		{Type: "page", URL: "https://www.doubao.com/chat/", WebSocketDebuggerURL: "ws://127.0.0.1:9222/devtools/page/doubao"},
 		{Type: "service_worker", URL: "https://www.doubao.com/", WebSocketDebuggerURL: "ws://127.0.0.1:9222/devtools/page/sw"},
 	}
-	got, ok := pickPageTarget(targets, 9222)
+	got, ok := pickPageTarget(targets, 9222, siteCN)
 	if !ok {
 		t.Fatal("expected a page target")
 	}
@@ -94,8 +115,22 @@ func TestPickPageTargetPrefersDoubaoChat(t *testing.T) {
 
 	if _, ok := pickPageTarget([]devToolsTarget{
 		{Type: "page", URL: "about:blank", WebSocketDebuggerURL: "ws://127.0.0.1:9223/devtools/page/blank"},
-	}, 9222); ok {
+	}, 9222, siteCN); ok {
 		t.Fatal("accepted a target on the wrong port")
+	}
+}
+
+func TestPickPageTargetPrefersDolaChat(t *testing.T) {
+	targets := []devToolsTarget{
+		{Type: "page", URL: "https://www.doubao.com/chat/", WebSocketDebuggerURL: "ws://127.0.0.1:9222/devtools/page/doubao"},
+		{Type: "page", URL: "https://www.dola.com/chat/", WebSocketDebuggerURL: "ws://127.0.0.1:9222/devtools/page/dola"},
+	}
+	got, ok := pickPageTarget(targets, 9222, siteGlobal)
+	if !ok {
+		t.Fatal("expected a page target")
+	}
+	if got.URL != "https://www.dola.com/chat/" {
+		t.Fatalf("target URL = %q", got.URL)
 	}
 }
 
@@ -141,7 +176,7 @@ func TestMergeEnvironmentReplacesCaseInsensitive(t *testing.T) {
 	}
 }
 
-func TestBrowserExecutableCandidatesPreferEdge(t *testing.T) {
+func TestBrowserExecutableCandidatesUseChromeOnly(t *testing.T) {
 	getenv := func(name string) string {
 		switch name {
 		case "ProgramFiles":
@@ -155,21 +190,37 @@ func TestBrowserExecutableCandidatesPreferEdge(t *testing.T) {
 		}
 	}
 	candidates := browserExecutableCandidates(`C:\Users\test`, getenv)
-	edgeIndex, chromeIndex := -1, -1
-	for index, candidate := range candidates {
+	for _, candidate := range candidates {
 		lower := strings.ToLower(candidate)
-		if edgeIndex < 0 && strings.Contains(lower, `microsoft\edge`) {
-			edgeIndex = index
-		}
-		if chromeIndex < 0 && strings.Contains(lower, `google\chrome`) {
-			chromeIndex = index
+		if !strings.Contains(lower, `google\chrome`) {
+			t.Fatalf("non-Chrome fallback candidate: %s", candidate)
 		}
 	}
-	if edgeIndex < 0 || chromeIndex < 0 {
-		t.Fatalf("missing browser candidates: %v", candidates)
+	if len(candidates) == 0 {
+		t.Fatal("missing Chrome candidates")
 	}
-	if edgeIndex > chromeIndex {
-		t.Fatalf("Chrome was preferred over Edge: %v", candidates)
+}
+
+func TestParseBrowserCommand(t *testing.T) {
+	for command, want := range map[string]string{
+		`"C:\Program Files\Google\Chrome\Application\chrome.exe" --single-argument %1`: `C:\Program Files\Google\Chrome\Application\chrome.exe`,
+		`C:\Chrome\chrome.exe --single-argument %1`:                                    `C:\Chrome\chrome.exe`,
+	} {
+		got, err := parseBrowserCommand(command)
+		if err != nil || got != want {
+			t.Fatalf("parseBrowserCommand(%q) = %q, %v", command, got, err)
+		}
+	}
+}
+
+func TestIsChromiumBrowser(t *testing.T) {
+	for _, path := range []string{`C:\Chrome\chrome.exe`, `C:\Edge\msedge.exe`, `C:\Brave\brave.exe`} {
+		if !isChromiumBrowser(path) {
+			t.Fatalf("expected Chromium browser: %s", path)
+		}
+	}
+	if isChromiumBrowser(`C:\Firefox\firefox.exe`) {
+		t.Fatal("Firefox must not be treated as Chromium")
 	}
 }
 
@@ -179,7 +230,7 @@ func TestResolveBrowserExecutableOverride(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("DOUJIE_BROWSER_PATH", path)
-	got, err := resolveBrowserExecutable(t.TempDir())
+	got, err := resolveBrowserExecutableForUser(t.TempDir(), 0)
 	if err != nil {
 		t.Fatal(err)
 	}

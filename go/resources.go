@@ -80,6 +80,9 @@ func handleManagementGet(req pluginapi.ManagementRequest) (pluginapi.ManagementR
 		cacheControl = "no-store"
 	case req.Path == resourcePrefix+"/qr.png":
 		flow := newestFlow()
+		if token := req.Query.Get("flow"); token != "" {
+			flow = qrFlowByToken(token)
+		}
 		if flow == nil || len(flow.QRPNG) == 0 {
 			return pluginapi.ManagementResponse{StatusCode: http.StatusNotFound, Body: []byte("not found")}, nil
 		}
@@ -176,7 +179,7 @@ const browserAccountPage = `<!doctype html>
 <title>豆姐账号登录</title>
 <style>:root{color-scheme:dark}body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#0f172a;color:#e2e8f0;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}main{width:min(560px,100%);background:#1e293b;border-radius:18px;padding:34px;box-shadow:0 24px 70px rgba(0,0,0,.45)}h1{font-size:24px;margin:0 0 12px}p{line-height:1.7;color:#94a3b8}a{color:#38bdf8}.note{border-left:3px solid #38bdf8;background:#13233a;padding:12px 14px;border-radius:8px;color:#bae6fd}.small{font-size:13px;color:#64748b}</style></head>
 <body><main><h1>请在浏览器中完成登录</h1>
-<p>插件已打开一个独立的 Edge/Chrome 窗口。你可以使用手机号验证码、账号密码或飞书账号登录，不需要扫码。</p>
+<p>插件已使用系统默认浏览器打开一个独立窗口。你可以使用手机号验证码、账号密码或飞书账号登录，不需要扫码。</p>
 <div class="note">登录成功后，CPA 会自动读取该浏览器会话并完成授权。不要在这个窗口里打开其他账号的私人页面。</div>
 <p><a href="https://www.doubao.com/chat/" target="_blank" rel="noreferrer">如果浏览器没有自动弹出，点这里打开豆包</a></p>
 <p class="small">此窗口会在 5 分钟后失效；关闭本页不会中断已打开浏览器的登录。</p>

@@ -109,7 +109,7 @@ func extractPrompt(format string, payload []byte) (string, int, bool, error) {
 			turns = append(turns, promptTurn{Role: message.Role, Text: text})
 		}
 		prompt, chars, err := buildPrompt(strings.Join(system, "\n\n"), turns)
-		deep := strings.EqualFold(body.ReasoningEffort, "high") || strings.EqualFold(body.ReasoningEffort, "medium")
+		deep := reasoningEffortEnabled(body.ReasoningEffort)
 		return prompt, chars, deep, err
 	case "openai-response":
 		var body responsesRequest
@@ -136,7 +136,7 @@ func extractPrompt(format string, payload []byte) (string, int, bool, error) {
 			}
 		}
 		prompt, chars, err := buildPrompt(system, turns)
-		deep := body.Reasoning != nil && (strings.EqualFold(body.Reasoning.Effort, "high") || strings.EqualFold(body.Reasoning.Effort, "medium"))
+		deep := body.Reasoning != nil && reasoningEffortEnabled(body.Reasoning.Effort)
 		return prompt, chars, deep, err
 	default:
 		var body anthropicRequest
@@ -151,6 +151,15 @@ func extractPrompt(format string, payload []byte) (string, int, bool, error) {
 		prompt, chars, err := buildPrompt(system, turns)
 		deep := body.Thinking != nil && strings.EqualFold(body.Thinking.Type, "enabled")
 		return prompt, chars, deep, err
+	}
+}
+
+func reasoningEffortEnabled(effort string) bool {
+	switch strings.ToLower(strings.TrimSpace(effort)) {
+	case "low", "medium", "high":
+		return true
+	default:
+		return false
 	}
 }
 

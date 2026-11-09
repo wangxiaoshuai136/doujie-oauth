@@ -13,12 +13,13 @@ type browserLogin struct {
 	Port        int
 	UserDataDir string
 	PID         int
+	Site        string
 	WSURL       string
 	client      *cdpClient
 	mu          sync.Mutex
 }
 
-func startBrowserLogin() (*browserLogin, error) {
+func startBrowserLogin(site string) (*browserLogin, error) {
 	return nil, errors.New("browser login is only supported on Windows")
 }
 

@@ -35,6 +35,7 @@ type loginFlow struct {
 	Expires     time.Time
 	QRPNG       []byte
 	ImportToken string
+	QRToken     string
 	Browser     *browserLogin
 	Imported    *pluginapi.AuthData
 }
@@ -106,6 +107,21 @@ func manualImportFlow(token string) *loginFlow {
 	return nil
 }
 
+func qrFlowByToken(token string) *loginFlow {
+	flowMu.Lock()
+	defer flowMu.Unlock()
+	now := time.Now()
+	for _, flow := range flowStore {
+		if flow == nil || flow.Expires.Before(now) {
+			continue
+		}
+		if token != "" && flow.QRToken == token && len(flow.QRPNG) > 0 {
+			return flow
+		}
+	}
+	return nil
+}
+
 func completeManualImport(token string, auth pluginapi.AuthData) bool {
 	flowMu.Lock()
 	defer flowMu.Unlock()
@@ -120,7 +136,12 @@ func completeManualImport(token string, auth pluginapi.AuthData) bool {
 	return false
 }
 
-const browserEntryID = "doubao-account"
+const (
+	browserEntryID         = "doubao-account"
+	dolaBrowserEntryID     = "dola-account"
+	domesticQREntryID      = "doubao-qr"
+	internationalQREntryID = "dola-qr"
+)
 
 func closeAllFlows() {
 	flowMu.Lock()
@@ -191,14 +212,17 @@ func startLogin(req pluginapi.AuthLoginStartRequest, sender httpSender) (plugina
 	if err != nil {
 		return out, err
 	}
-	if req.Provider == browserEntryID {
-		return startBrowserAccountLogin(req, key)
+	switch req.Provider {
+	case entryID, browserEntryID:
+		return startBrowserAccountLogin(req, key, siteCN)
+	case internationalEntryID, dolaBrowserEntryID:
+		return startBrowserAccountLogin(req, key, siteGlobal)
 	}
 	if req.Provider == desktopEntryID {
 		return startDesktopImport(req, sender, key)
 	}
 	site := siteCN
-	if req.Provider == internationalEntryID {
+	if req.Provider == internationalQREntryID {
 		site = siteGlobal
 	}
 	profile := profileForSite(site)
@@ -254,13 +278,17 @@ func startLogin(req pluginapi.AuthLoginStartRequest, sender httpSender) (plugina
 		return out, errors.New("cannot generate login state")
 	}
 	expires := time.Now().Add(flowsTTL)
-	putFlow(flowID, &loginFlow{Site: site, Token: qrEnvelope.Data.Token, CSRF: csrf, Cookies: jar, Expires: expires, QRPNG: png})
+	qrToken, err := randomHex(16)
+	if err != nil {
+		return out, errors.New("cannot generate login QR token")
+	}
+	putFlow(flowID, &loginFlow{Site: site, Token: qrEnvelope.Data.Token, CSRF: csrf, Cookies: jar, Expires: expires, QRPNG: png, QRToken: qrToken})
 	state, err := sealState(key, flowID, expires)
 	if err != nil {
 		return out, err
 	}
 	base := absoluteBase(cfg.PublicBaseURL, req.BaseURL)
-	qrPath := resourcePrefix + "/qr.png"
+	qrPath := resourcePrefix + "/qr.png?flow=" + url.QueryEscape(qrToken)
 	out = pluginapi.AuthLoginStartResponse{
 		Provider:  credentialProvider,
 		URL:       base + qrPath,
@@ -350,11 +378,14 @@ func pollLogin(req pluginapi.AuthLoginPollRequest, sender httpSender) (pluginapi
 	if flow.Browser != nil {
 		cookies, browserErr := flow.Browser.PollCookies()
 		if browserErr == nil && strings.TrimSpace(cookies["sessionid"]) != "" {
-			auth, authErr := authFromCookies(cookies, siteCN)
+			auth, authErr := authFromCookies(cookies, flow.Site)
 			if authErr != nil {
 				return pluginapi.AuthLoginPollResponse{Status: pluginapi.AuthLoginStatusError, Message: authErr.Error()}, nil
 			}
-			auth.Metadata["oauth_provider"] = browserEntryID
+			auth.Metadata["oauth_provider"] = entryID
+			if normalizeSite(flow.Site) == siteGlobal {
+				auth.Metadata["oauth_provider"] = internationalEntryID
+			}
 			flow.Browser.Close()
 			takeFlow(flowID)
 			return pluginapi.AuthLoginPollResponse{Status: pluginapi.AuthLoginStatusSuccess, Auth: auth}, nil
@@ -462,7 +493,9 @@ func authFromCookies(jar map[string]string, site string) (pluginapi.AuthData, er
 }
 
 func parseAuth(req pluginapi.AuthParseRequest) pluginapi.AuthParseResponse {
-	if req.Provider != entryID && req.Provider != internationalEntryID && req.Provider != desktopEntryID && req.Provider != browserEntryID && req.Provider != credentialProvider {
+	if req.Provider != entryID && req.Provider != internationalEntryID && req.Provider != desktopEntryID &&
+		req.Provider != browserEntryID && req.Provider != dolaBrowserEntryID &&
+		req.Provider != domesticQREntryID && req.Provider != internationalQREntryID && req.Provider != credentialProvider {
 		return pluginapi.AuthParseResponse{}
 	}
 	var persisted struct {
@@ -613,9 +646,9 @@ func startDesktopImport(req pluginapi.AuthLoginStartRequest, sender httpSender, 
 	return out, nil
 }
 
-func startBrowserAccountLogin(req pluginapi.AuthLoginStartRequest, key []byte) (pluginapi.AuthLoginStartResponse, error) {
+func startBrowserAccountLogin(req pluginapi.AuthLoginStartRequest, key []byte, site string) (pluginapi.AuthLoginStartResponse, error) {
 	var out pluginapi.AuthLoginStartResponse
-	browser, err := startBrowserLogin()
+	browser, err := startBrowserLogin(site)
 	if err != nil {
 		return out, fmt.Errorf("cannot open browser sign-in: %w", err)
 	}
@@ -625,7 +658,7 @@ func startBrowserAccountLogin(req pluginapi.AuthLoginStartRequest, key []byte) (
 		return out, errors.New("cannot generate login state")
 	}
 	expires := time.Now().Add(flowsTTL)
-	putFlow(flowID, &loginFlow{Site: siteCN, Expires: expires, Browser: browser})
+	putFlow(flowID, &loginFlow{Site: normalizeSite(site), Expires: expires, Browser: browser})
 	state, err := sealState(key, flowID, expires)
 	if err != nil {
 		browser.Close()

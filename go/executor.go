@@ -91,7 +91,7 @@ func execute(req pluginapi.ExecutorRequest, sender httpSender) (pluginapi.Execut
 	}
 	usageEvents.record(req.AuthID, collectErr != nil)
 	if collectErr != nil {
-		return pluginapi.ExecutorResponse{}, pluginabi.NewError("upstream_error", collectErr.Error(), 502)
+		return pluginapi.ExecutorResponse{}, upstreamFailureError(collectErr.Error())
 	}
 	return pluginapi.ExecutorResponse{
 		Payload: encodeMessage(plan.Format, plan.Model, text, think),
@@ -134,15 +134,74 @@ func executeStream(req pluginapi.ExecutorRequest, callbackID, streamID string, s
 		}
 		return nil, upstreamError(response.StatusCode, raw)
 	}
-	go forwardDoubao(response.StreamID, streamID, req.AuthID, plan.Model, plan.Format, plan.Endpoint, dataFramedChunks(req), release)
+	initial, err := bootstrapDoubaoStream(response.StreamID, plan.Endpoint)
+	if err != nil {
+		closeHostStream(response.StreamID)
+		release()
+		usageEvents.record(req.AuthID, true)
+		return nil, err
+	}
+	go forwardDoubao(response.StreamID, streamID, req.AuthID, plan.Model, plan.Format, plan.Endpoint, dataFramedChunks(req), initial, release)
 	return map[string]any{"headers": http.Header{"Content-Type": {"text/event-stream"}, "Cache-Control": {"no-cache"}}}, nil
 }
 
-func forwardDoubao(source, target, authID, model, format, endpoint string, dataOnly bool, release func()) {
+// bootstrapDoubaoStream waits for the first meaningful upstream event before
+// CPA commits an SSE response. This lets quota/auth failures trigger normal
+// credential retry instead of becoming a 200 stream that can no longer fail
+// over to another account.
+func bootstrapDoubaoStream(source, endpoint string) ([]byte, error) {
+	var pending []byte
+	inThinking := false
+	parse := func(payload []byte) (doubaoMessage, bool) {
+		if endpoint == "chat" {
+			return parseChatEvent(payload, &inThinking)
+		}
+		return parseDoubaoEvent(payload)
+	}
+	for {
+		chunk, err := readHostStream(source)
+		if err != nil {
+			return nil, pluginabi.NewError("transport_error", "Doubao upstream stream failed", 503)
+		}
+		pending = append(pending, chunk.Payload...)
+		if len(pending) > 8<<20 {
+			return nil, pluginabi.NewError("upstream_error", "Doubao upstream stream too large", 502)
+		}
+		normalized := bytes.ReplaceAll(pending, []byte("\r\n"), []byte("\n"))
+		for {
+			index := bytes.Index(normalized, []byte("\n\n"))
+			if index < 0 {
+				break
+			}
+			block := string(normalized[:index])
+			normalized = normalized[index+2:]
+			payload := sseData(block)
+			if payload == "" {
+				continue
+			}
+			msg, ok := parse([]byte(payload))
+			if !ok {
+				continue
+			}
+			if msg.Failure != "" {
+				return nil, upstreamFailureError(msg.Failure)
+			}
+			if msg.Text != "" || msg.Think != "" || msg.Finished {
+				return pending, nil
+			}
+		}
+		if chunk.Done {
+			return nil, pluginabi.NewError("upstream_error", "Doubao returned no answer", 502)
+		}
+	}
+}
+
+func forwardDoubao(source, target, authID, model, format, endpoint string, dataOnly bool, initial []byte, release func()) {
 	defer release()
 	defer closeHostStream(source)
 	stream := newStreamEncoder(format, model, dataOnly)
 	streamError := ""
+	var pending []byte
 	inThinking := false
 	parse := func(payload []byte) (doubaoMessage, bool) {
 		if endpoint == "chat" {
@@ -161,12 +220,48 @@ func forwardDoubao(source, target, authID, model, format, endpoint string, dataO
 		}
 		return true
 	}
+	processPending := func() (bool, string) {
+		for {
+			index := bytes.Index(pending, []byte("\n\n"))
+			if index < 0 {
+				return false, ""
+			}
+			block := string(pending[:index])
+			pending = pending[index+2:]
+			payload := sseData(block)
+			if payload == "" {
+				continue
+			}
+			msg, ok := parse([]byte(payload))
+			if !ok {
+				continue
+			}
+			if msg.Failure != "" {
+				return false, sanitizeUpstream(msg.Failure)
+			}
+			if !emit(stream.Handle(msg)) {
+				return false, "downstream closed"
+			}
+			if msg.Finished {
+				return true, ""
+			}
+		}
+	}
 	if !emit(stream.Start()) {
 		closeStream(target, "downstream closed")
 		return
 	}
-	var pending []byte
+	pending = bytes.ReplaceAll(append([]byte(nil), initial...), []byte("\r\n"), []byte("\n"))
 	finished := false
+	if len(pending) > 0 {
+		var processErr string
+		finished, processErr = processPending()
+		if processErr != "" {
+			usageEvents.record(authID, true)
+			closeStream(target, processErr)
+			return
+		}
+	}
 	for !finished {
 		chunk, err := readHostStream(source)
 		if err != nil {
@@ -180,33 +275,12 @@ func forwardDoubao(source, target, authID, model, format, endpoint string, dataO
 			closeStream(target, "Doubao upstream stream too large")
 			return
 		}
-		for {
-			index := bytes.Index(pending, []byte("\n\n"))
-			if index < 0 {
-				break
-			}
-			block := string(pending[:index])
-			pending = pending[index+2:]
-			payload := sseData(block)
-			if payload == "" {
-				continue
-			}
-			msg, ok := parse([]byte(payload))
-			if !ok {
-				continue
-			}
-			if msg.Failure != "" {
-				streamError = sanitizeUpstream(msg.Failure)
-				closeStream(target, streamError)
-				return
-			}
-			if !emit(stream.Handle(msg)) {
-				closeStream(target, "downstream closed")
-				return
-			}
-			if msg.Finished {
-				finished = true
-			}
+		var processErr string
+		finished, processErr = processPending()
+		if processErr != "" {
+			usageEvents.record(authID, true)
+			closeStream(target, processErr)
+			return
 		}
 		if chunk.Done {
 			break
@@ -258,7 +332,9 @@ func upstreamError(status int, body []byte) error {
 	case status == http.StatusUnauthorized || status == http.StatusForbidden:
 		return pluginabi.NewError("reauth_required", "Doubao session expired or rejected; sign in again", 401)
 	case status == http.StatusTooManyRequests:
-		return pluginabi.NewError("quota_exhausted", "Doubao rate limit or subscription quota reached: "+message, 429)
+		return quotaFailureError(message)
+	case quotaExhaustedMessage(message):
+		return quotaFailureError(message)
 	case status >= 500:
 		return pluginabi.NewError("upstream_error", "Doubao upstream failed: "+message, 502)
 	case status == 0:
@@ -266,6 +342,49 @@ func upstreamError(status int, body []byte) error {
 	default:
 		return pluginabi.NewError("upstream_rejected", "Doubao rejected the request: "+message, status)
 	}
+}
+
+func upstreamFailureError(message string) error {
+	message = sanitizeUpstream(message)
+	if quotaExhaustedMessage(message) {
+		return quotaFailureError(message)
+	}
+	return pluginabi.NewError("upstream_error", "Doubao upstream failed: "+message, 502)
+}
+
+func quotaFailureError(message string) error {
+	return pluginabi.NewError("quota_exhausted", "Doubao rate limit or subscription quota reached: "+sanitizeUpstream(message), 429)
+}
+
+func quotaExhaustedMessage(message string) bool {
+	text := strings.ToLower(strings.TrimSpace(message))
+	if text == "" {
+		return false
+	}
+	for _, marker := range []string{
+		"insufficient_quota",
+		"quota exceeded",
+		"quota exhausted",
+		"usage limit",
+		"rate limit",
+		"too many requests",
+		"额度不足",
+		"额度已用完",
+		"额度已耗尽",
+		"额度耗尽",
+		"配额不足",
+		"配额已用完",
+		"配额耗尽",
+		"次数已用完",
+		"请求次数已达上限",
+		"使用次数已达上限",
+		"免费次数已用完",
+	} {
+		if strings.Contains(text, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func upstreamMessage(body []byte) string {

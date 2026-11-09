@@ -37,6 +37,21 @@ func TestExtractPromptOpenAI(t *testing.T) {
 	}
 }
 
+func TestReasoningEffortLevels(t *testing.T) {
+	for _, effort := range []string{"low", "medium", "high"} {
+		payload := []byte(`{"model":"doubao","messages":[{"role":"user","content":"hi"}],"reasoning_effort":"` + effort + `"}`)
+		_, _, deep, err := extractPrompt("openai", payload)
+		if err != nil || !deep {
+			t.Fatalf("effort %q: deep=%v err=%v", effort, deep, err)
+		}
+	}
+	payload := []byte(`{"model":"doubao","messages":[{"role":"user","content":"hi"}],"reasoning_effort":"none"}`)
+	_, _, deep, err := extractPrompt("openai", payload)
+	if err != nil || deep {
+		t.Fatalf("none effort should be disabled: deep=%v err=%v", deep, err)
+	}
+}
+
 func TestExtractPromptResponses(t *testing.T) {
 	payload := []byte(`{"model":"doubao","instructions":"规则","input":[{"role":"user","content":[{"type":"input_text","text":"问题"}]}],"reasoning":{"effort":"high"}}`)
 	prompt, chars, deep, err := extractPrompt("openai-response", payload)

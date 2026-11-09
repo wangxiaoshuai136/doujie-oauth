@@ -139,7 +139,7 @@ func TestStartLoginGlobalUsesDolaFlow(t *testing.T) {
 		{StatusCode: http.StatusOK, Body: []byte(`{"data":{"token":"token","qrcode":"` + png + `"}}`)},
 	}}
 	resp, err := startLogin(pluginapi.AuthLoginStartRequest{
-		Provider: internationalEntryID,
+		Provider: internationalQREntryID,
 		BaseURL:  "http://127.0.0.1:8317/v8/management/oauth/callback",
 		Host:     pluginapi.HostConfigSummary{AuthDir: dir},
 	}, sender)
@@ -163,7 +163,7 @@ func TestStartLoginGlobalUsesDolaFlow(t *testing.T) {
 	if !strings.Contains(sender.requests[2].Headers.Get("Cookie"), "passport_csrf_token=csrf") {
 		t.Fatalf("CSRF cookie not forwarded: %q", sender.requests[2].Headers.Get("Cookie"))
 	}
-	if resp.URL != "http://127.0.0.1:8317"+resourcePrefix+"/qr.png" {
+	if !strings.HasPrefix(resp.URL, "http://127.0.0.1:8317"+resourcePrefix+"/qr.png?flow=") {
 		t.Fatalf("QR URL = %q", resp.URL)
 	}
 }

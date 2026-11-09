@@ -43,6 +43,14 @@ var doubaoModels = []modelSpec{
 func staticModels() []pluginapi.ModelInfo {
 	out := make([]pluginapi.ModelInfo, 0, len(doubaoModels))
 	for _, spec := range doubaoModels {
+		var thinking *pluginapi.ThinkingSupport
+		if len(spec.Outputs) == 0 {
+			thinking = &pluginapi.ThinkingSupport{
+				ZeroAllowed:    true,
+				DynamicAllowed: true,
+				Levels:         []string{"low", "medium", "high"},
+			}
+		}
 		out = append(out, pluginapi.ModelInfo{
 			ID:                         spec.ID,
 			Object:                     "model",
@@ -60,7 +68,7 @@ func staticModels() []pluginapi.ModelInfo {
 			SupportedInputModalities:   []string{"text"},
 			SupportedOutputModalities:  spec.Outputs,
 			SupportedParameters:        []string{"prompt", "ratio"},
-			Thinking:                   &pluginapi.ThinkingSupport{Levels: []string{"none", "high"}},
+			Thinking:                   thinking,
 		})
 	}
 	return out
