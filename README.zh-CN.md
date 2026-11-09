@@ -115,6 +115,12 @@ OAuth 发起和轮询使用 CPA 原生受认证管理 API，公共插件资源�
 当前为文生视频；`seedance-*` 选择通过提示词交给豆包 agent，时长和分辨率由账号当前
 可用能力决定。
 
+### 独立视频 Skill
+
+仓库同时包含 [`skills/doubao-session-video/`](skills/doubao-session-video/)：
+它把同一套“已登录豆包会话生成视频”的能力封装成独立 Python CLI，方便不能直接调用
+CPA 插件的智能体使用。桌面会话导入、模型名称、任务日志和测试命令见该目录 README。
+
 ## 安装
 
 从 [Releases](https://github.com/wangxiaoshuai136/doujie-oauth/releases) 下载对应
@@ -186,6 +192,7 @@ assets/dola.png      国际版登录图标
 go/                  Go/cgo 插件实现与测试
 docs/USAGE.md        部署安装与使用指南
 scripts/             Windows 桌面端导入脚本
+skills/              可选的独立豆包视频 Skill
 ```
 
 ## 许可证与免责声明

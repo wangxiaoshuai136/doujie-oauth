@@ -132,6 +132,14 @@ The current flow is text-to-video. Model choice is passed to the Doubao agent as
 a prompt-level preference; duration and resolution depend on the account's
 available model capabilities.
 
+### Companion video skill
+
+The repository also ships an optional Python skill at
+[`skills/doubao-session-video/`](skills/doubao-session-video/). It exposes the
+same signed-in-session video flow as a standalone CLI for agents that cannot call
+the CPA plugin directly. See its README for desktop-session import, model names,
+task logging and test commands.
+
 ## Installation
 
 Download the archive for your platform from
@@ -208,6 +216,7 @@ assets/dola.png      International sign-in icon
 go/                  Go/cgo plugin implementation and tests
 docs/USAGE.md        Operator installation and usage guide
 scripts/             Windows desktop import helper
+skills/              Optional standalone Doubao video skill
 ```
 
 ## License and disclaimer

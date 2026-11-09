@@ -34,4 +34,7 @@ doubao-cli-docs.txt
 # reverse-engineering artifacts
 /desktop-web-chunks/
 /tools/
+/.playwright-mcp/
+__pycache__/
+*.pyc
 
