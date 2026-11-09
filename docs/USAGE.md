@@ -18,8 +18,9 @@ plugins:
       # public_base_url: https://cpa.example.com
 ```
 
-`public_base_url` is only needed when your panel does not pass an absolute base
-URL to the plugin. It is used to build the QR image address.
+`public_base_url` is needed for remote panels or reverse proxies. Local panels
+default to `http://127.0.0.1:<port>`; the plugin never appends resource paths to
+CPA's OAuth callback URL.
 
 ## 2. Authentication
 
@@ -30,6 +31,14 @@ URL to the plugin. It is used to build the QR image address.
    credential immediately.
 3. No mobile scanning required, ensuring the imported account matches your
    active desktop profile.
+
+Doubao keeps its cookie database open while running. If the session is locked,
+the plugin opens a no-QR import page instead of failing:
+
+1. Quit Doubao completely from the notification-area tray.
+2. Reopen the import page and click **重新读取桌面端**.
+
+The import link expires with the normal five-minute login flow.
 
 Headless server import is also supported:
 

@@ -7,10 +7,13 @@ import (
 )
 
 type modelSpec struct {
-	ID      string
-	Display string
-	Context int64
-	Output  int64
+	ID          string
+	Display     string
+	Description string
+	Context     int64
+	Output      int64
+	Version     string
+	Outputs     []string
 }
 
 var doubaoModels = []modelSpec{
@@ -22,6 +25,15 @@ var doubaoModels = []modelSpec{
 	{ID: "doubao-seed-1.6-thinking", Display: "豆姐 Seed 1.6 思考", Context: 256000, Output: 32000},
 	{ID: "doubao-seed-1.6-flash", Display: "豆姐 Seed 1.6 Flash", Context: 256000, Output: 32000},
 	{ID: "doubao-pro", Display: "豆姐 Pro", Context: 131072, Output: 16384},
+	{
+		ID:          "doubao-video",
+		Display:     "豆姐 Seedance 2.5",
+		Description: "Generate a video through the signed-in Doubao session and return the video URL.",
+		Context:     8192,
+		Output:      2048,
+		Version:     "seedance_2.5",
+		Outputs:     []string{"text", "video"},
+	},
 }
 
 func staticModels() []pluginapi.ModelInfo {
@@ -38,7 +50,12 @@ func staticModels() []pluginapi.ModelInfo {
 			InputTokenLimit:            spec.Context,
 			MaxCompletionTokens:        spec.Output,
 			OutputTokenLimit:           spec.Output,
+			Version:                    spec.Version,
+			Description:                spec.Description,
 			SupportedGenerationMethods: []string{"chat"},
+			SupportedInputModalities:   []string{"text"},
+			SupportedOutputModalities:  spec.Outputs,
+			SupportedParameters:        []string{"prompt", "ratio"},
 			Thinking:                   &pluginapi.ThinkingSupport{Levels: []string{"none", "high"}},
 		})
 	}

@@ -12,7 +12,6 @@ permissions:
 
 env:
   PLUGIN_ID: doujie-oauth
-  VERSION: 0.1.1
 
 jobs:
   test:
@@ -57,6 +56,15 @@ jobs:
         if: runner.os == 'Windows'
         shell: bash
         run: echo "C:/msys64/mingw64/bin" >> "$GITHUB_PATH"
+      - name: Resolve version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="0.1.3"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          fi
+          echo "VERSION=${version}" >> "$GITHUB_ENV"
       - name: Build shared library
         shell: bash
         env:
@@ -97,15 +105,22 @@ jobs:
         with:
           path: dist
           merge-multiple: true
+      - name: Generate checksums.txt
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum *.zip | sort -k2 > checksums.txt
       - name: Verify assets
         run: |
           set -euo pipefail
           ls -l dist
           test -n "$(ls dist/*.zip 2>/dev/null)"
+          test -s dist/checksums.txt
       - uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/*.zip
-            dist/*.zip.sha256
+            dist/checksums.txt
           generate_release_notes: true
 

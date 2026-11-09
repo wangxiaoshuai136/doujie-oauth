@@ -28,13 +28,14 @@ const (
 )
 
 type loginFlow struct {
-	Site     string
-	Token    string
-	CSRF     string
-	Cookies  map[string]string
-	Expires  time.Time
-	QRPNG    []byte
-	Imported *pluginapi.AuthData
+	Site        string
+	Token       string
+	CSRF        string
+	Cookies     map[string]string
+	Expires     time.Time
+	QRPNG       []byte
+	ImportToken string
+	Imported    *pluginapi.AuthData
 }
 
 var flowMu sync.Mutex
@@ -86,6 +87,36 @@ func peekFlow(id string) *loginFlow {
 		return nil
 	}
 	return flow
+}
+
+func manualImportFlow(token string) *loginFlow {
+	flowMu.Lock()
+	defer flowMu.Unlock()
+	now := time.Now()
+	for id, flow := range flowStore {
+		if flow == nil || flow.Expires.Before(now) {
+			delete(flowStore, id)
+			continue
+		}
+		if token != "" && flow.ImportToken == token {
+			return flow
+		}
+	}
+	return nil
+}
+
+func completeManualImport(token string, auth pluginapi.AuthData) bool {
+	flowMu.Lock()
+	defer flowMu.Unlock()
+	for _, flow := range flowStore {
+		if flow == nil || flow.Expires.Before(time.Now()) || token == "" || flow.ImportToken != token {
+			continue
+		}
+		copy := auth
+		flow.Imported = &copy
+		return true
+	}
+	return false
 }
 
 func browserHeaders(extra http.Header) http.Header {
@@ -230,11 +261,20 @@ func startLogin(req pluginapi.AuthLoginStartRequest, sender httpSender) (plugina
 	return out, nil
 }
 
-func absoluteBase(candidates ...string) string {
-	for _, raw := range candidates {
-		if u, ok := httpBaseURL(raw); ok {
-			return strings.TrimSuffix(u.String(), "/")
-		}
+func absoluteBase(publicBase, hostBase string) string {
+	// public_base_url is an operator override and may deliberately include a
+	// reverse-proxy path. CPA's login BaseURL, however, is the OAuth callback
+	// URL, not an asset root; only its origin belongs in public resource links.
+	if u, ok := httpBaseURL(publicBase); ok {
+		return strings.TrimSuffix(u.String(), "/")
+	}
+	if u, ok := httpBaseURL(hostBase); ok {
+		u.Path = ""
+		u.RawPath = ""
+		u.RawQuery = ""
+		u.ForceQuery = false
+		u.Fragment = ""
+		return strings.TrimSuffix(u.String(), "/")
 	}
 	return ""
 }
@@ -286,6 +326,10 @@ func pollLogin(req pluginapi.AuthLoginPollRequest, sender httpSender) (pluginapi
 	if flow.Imported != nil {
 		takeFlow(flowID)
 		return pluginapi.AuthLoginPollResponse{Status: pluginapi.AuthLoginStatusSuccess, Auth: *flow.Imported}, nil
+	}
+	if flow.ImportToken != "" {
+		pending.Message = "等待手动导入登录态"
+		return pending, nil
 	}
 	profile := profileForSite(flow.Site)
 	next := url.QueryEscape(profile.Root)
@@ -487,34 +531,49 @@ func startDesktopImport(req pluginapi.AuthLoginStartRequest, sender httpSender, 
 		return out, errors.New("CPA auth directory unavailable")
 	}
 	cookies, err := readDesktopCookies()
-	if err != nil {
-		return out, err
-	}
-	authData, err := importDesktopAuth(sender, cookies)
-	if err != nil {
-		return out, err
+	var authData pluginapi.AuthData
+	if err == nil {
+		authData, err = importDesktopAuth(sender, cookies)
+		if err != nil {
+			return out, err
+		}
 	}
 	flowID, err := randomHex(16)
 	if err != nil {
 		return out, errors.New("cannot generate login state")
 	}
 	expires := time.Now().Add(flowsTTL)
-	putFlow(flowID, &loginFlow{Site: siteCN, Expires: expires, Imported: &authData})
+	flow := &loginFlow{Site: siteCN, Expires: expires}
+	if authData.Provider != "" {
+		flow.Imported = &authData
+	} else {
+		flow.ImportToken, err = randomHex(16)
+		if err != nil {
+			return out, errors.New("cannot generate import token")
+		}
+	}
+	putFlow(flowID, flow)
 	state, err := sealState(key, flowID, expires)
 	if err != nil {
 		return out, err
 	}
 	cfg := getConfig()
 	base := absoluteBase(cfg.PublicBaseURL, req.BaseURL)
+	resourceURL := base + resourcePrefix + "/imported.html"
+	metadata := map[string]any{"source": "desktop-import"}
+	if flow.Imported != nil {
+		metadata["label"] = authData.Label
+	} else {
+		resourceURL = base + resourcePrefix + "/manual.html?token=" + url.QueryEscape(flow.ImportToken)
+		metadata["source"] = "manual-import"
+		metadata["message"] = "桌面端 Cookies 正在被占用，请在打开的页面中完成免扫码导入"
+	}
 	out = pluginapi.AuthLoginStartResponse{
 		Provider:  credentialProvider,
-		URL:       base + resourcePrefix + "/imported.html",
+		URL:       resourceURL,
 		State:     state,
 		ExpiresAt: expires.UTC(),
-		Metadata: map[string]any{
-			"source": "desktop-import",
-			"label":  authData.Label,
-		},
+		Metadata:  metadata,
 	}
 	return out, nil
 }

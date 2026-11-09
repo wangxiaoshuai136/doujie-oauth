@@ -11,8 +11,14 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
 )
 
+type concurrencyGate struct {
+	mu     sync.Mutex
+	cond   *sync.Cond
+	active int
+}
+
 var gateMu sync.Mutex
-var gates = map[string]chan struct{}{}
+var gates = map[string]*concurrencyGate{}
 
 func acquire(id string) func() {
 	if id == "" {
@@ -21,19 +27,48 @@ func acquire(id string) func() {
 	gateMu.Lock()
 	gate := gates[id]
 	if gate == nil {
+		gate = &concurrencyGate{}
+		gate.cond = sync.NewCond(&gate.mu)
+		gates[id] = gate
+	}
+	gateMu.Unlock()
+	gate.mu.Lock()
+	for {
 		limit := getConfig().MaxConcurrency
 		if limit < 1 {
 			limit = 1
 		}
-		gate = make(chan struct{}, limit)
-		gates[id] = gate
+		if gate.active < limit {
+			break
+		}
+		gate.cond.Wait()
 	}
-	gateMu.Unlock()
-	gate <- struct{}{}
-	return func() { <-gate }
+	gate.active++
+	gate.mu.Unlock()
+	return func() {
+		gate.mu.Lock()
+		if gate.active > 0 {
+			gate.active--
+		}
+		gate.cond.Signal()
+		gate.mu.Unlock()
+	}
+}
+
+func broadcastGateUpdates() {
+	gateMu.Lock()
+	defer gateMu.Unlock()
+	for _, gate := range gates {
+		gate.mu.Lock()
+		gate.cond.Broadcast()
+		gate.mu.Unlock()
+	}
 }
 
 func execute(req pluginapi.ExecutorRequest, sender httpSender) (pluginapi.ExecutorResponse, error) {
+	if isVideoModel(req.Model) {
+		return executeVideo(req, sender)
+	}
 	release := acquire(req.AuthID)
 	defer release()
 	plan, err := buildRequest(req, sender)
@@ -72,6 +107,9 @@ func execute(req pluginapi.ExecutorRequest, sender httpSender) (pluginapi.Execut
 func executeStream(req pluginapi.ExecutorRequest, callbackID, streamID string, sender httpSender) (map[string]any, error) {
 	if streamID == "" {
 		return nil, pluginabi.NewError("invalid_request", "stream ID required", 400)
+	}
+	if isVideoModel(req.Model) {
+		return executeVideoStream(req, callbackID, streamID, sender)
 	}
 	release := acquire(req.AuthID)
 	plan, err := buildRequest(req, sender)

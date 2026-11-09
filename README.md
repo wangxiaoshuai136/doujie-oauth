@@ -12,7 +12,7 @@
 <p align="center">
   <a href="https://github.com/wangxiaoshuai136/doujie-oauth/releases"><img src="https://img.shields.io/github/v/release/wangxiaoshuai136/doujie-oauth?label=release" alt="Release"></a>
   <a href="https://github.com/wangxiaoshuai136/doujie-oauth/actions/workflows/build.yml"><img src="https://github.com/wangxiaoshuai136/doujie-oauth/actions/workflows/build.yml/badge.svg" alt="CI"></a>
-  <img src="https://img.shields.io/badge/CLIProxyAPI-v8+-4f46e5" alt="CLIProxyAPI v8+">
+  <img src="https://img.shields.io/badge/CLIProxyAPI-v8.0.49%2B-4f46e5" alt="CLIProxyAPI v8.0.49+">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license">
 </p>
 
@@ -21,7 +21,7 @@
 </p>
 
 Doujie OAuth adds the `doubao` provider to CLIProxyAPI. After you explicitly
-choose the domestic or Dola international entry and finish QR sign-in, CPA gains
+choose a domestic or Dola international entry and finish sign-in, CPA gains
 model discovery, native Anthropic Messages, OpenAI Chat Completions and OpenAI
 Responses execution, plus normalized quota and reset-card support — no local
 browser process and no enterprise CLI client.
@@ -32,7 +32,7 @@ browser process and no enterprise CLI client.
 > trademark holder; all consequences of use are the user's responsibility. See the
 > full disclaimer below.
 
-## Two QR portals, one provider
+## Two sign-in portals, one provider
 
 The domestic and Dola international portals produce the same credential
 (`"type": "doubao"`) and share one executor, but they use different sites,
@@ -44,6 +44,10 @@ instead of switching regions automatically by IP or browser language.
 | Doujie (domestic) | `doubao` | Default domestic site; uses `assets/doubao.png` |
 | Doujie international (Dola) | `dola` | Independent international site; uses `assets/dola.png`; subject to upstream regional policy |
 | Doujie desktop import | `doubao-desktop` | Windows local session import; produces a domestic credential |
+
+QR scanning is optional. The desktop entry imports the local session without a
+phone. If Doubao is running and holds its cookie database open, the plugin opens
+a no-QR import page: quit Doubao from the tray, then retry on that page.
 
 On panels that render per-entry metadata (CPA v8.0.51+), each entry appears as
 its own card with its own name and icon. Picking an entry picks the site; the
@@ -71,6 +75,7 @@ The plugin needs no local callback listener and no separate browser process.
 - Separate domestic and Dola international QR entries; domestic by default, never
   auto-switching regions.
 - Windows desktop session import to avoid phone/desktop account mismatch.
+- No-QR fallback page for a locked desktop cookie database.
 - Native Anthropic Messages, OpenAI Chat Completions and OpenAI Responses
   execution.
 - Deep-thinking and reasoning streaming.
@@ -154,7 +159,7 @@ doujie-oauth_<version>_linux_arm64.zip
 doujie-oauth_<version>_darwin_amd64.zip
 doujie-oauth_<version>_darwin_arm64.zip
 doujie-oauth_<version>_windows_amd64.zip
-*.zip.sha256
+checksums.txt
 ```
 
 Each archive contains the correctly named `doujie-oauth.so`,

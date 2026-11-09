@@ -10,14 +10,15 @@ import (
 )
 
 type config struct {
-	MaxConcurrency int    `yaml:"max_concurrency"`
-	BotID          string `yaml:"bot_id"`
-	DeepThink      bool   `yaml:"deep_think"`
-	Signer         string `yaml:"signer"`
-	SignerURL      string `yaml:"signer_url"`
-	PublicBaseURL  string `yaml:"public_base_url"`
-	AppVersion     string `yaml:"app_version"`
-	Endpoint       string `yaml:"endpoint"`
+	MaxConcurrency     int    `yaml:"max_concurrency"`
+	BotID              string `yaml:"bot_id"`
+	DeepThink          bool   `yaml:"deep_think"`
+	Signer             string `yaml:"signer"`
+	SignerURL          string `yaml:"signer_url"`
+	PublicBaseURL      string `yaml:"public_base_url"`
+	AppVersion         string `yaml:"app_version"`
+	Endpoint           string `yaml:"endpoint"`
+	VideoTimeoutSecond int    `yaml:"video_timeout_seconds"`
 }
 
 var configMu sync.RWMutex
@@ -25,12 +26,13 @@ var currentConfig = defaults()
 
 func defaults() config {
 	return config{
-		MaxConcurrency: 3,
-		BotID:          defaultBotID,
-		DeepThink:      false,
-		Signer:         "none",
-		AppVersion:     "2.1.7",
-		Endpoint:       "samantha",
+		MaxConcurrency:     3,
+		BotID:              defaultBotID,
+		DeepThink:          false,
+		Signer:             "none",
+		AppVersion:         "2.1.7",
+		Endpoint:           "samantha",
+		VideoTimeoutSecond: 300,
 	}
 }
 
@@ -80,6 +82,12 @@ func configure(raw []byte) error {
 	if c.Endpoint != "samantha" && c.Endpoint != "chat" {
 		return fmt.Errorf("invalid doubao plugin configuration: endpoint must be samantha or chat")
 	}
+	if c.VideoTimeoutSecond == 0 {
+		c.VideoTimeoutSecond = 300
+	}
+	if c.VideoTimeoutSecond < 30 || c.VideoTimeoutSecond > 1800 {
+		return fmt.Errorf("invalid doubao plugin configuration: video_timeout_seconds must be between 30 and 1800")
+	}
 	c.AppVersion = strings.TrimSpace(c.AppVersion)
 	if c.AppVersion == "" {
 		return fmt.Errorf("invalid doubao plugin configuration: app_version must not be empty")
@@ -87,6 +95,7 @@ func configure(raw []byte) error {
 	configMu.Lock()
 	currentConfig = c
 	configMu.Unlock()
+	broadcastGateUpdates()
 	return nil
 }
 

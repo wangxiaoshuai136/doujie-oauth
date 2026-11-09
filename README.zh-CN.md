@@ -12,7 +12,7 @@
 <p align="center">
   <a href="https://github.com/wangxiaoshuai136/doujie-oauth/releases"><img src="https://img.shields.io/github/v/release/wangxiaoshuai136/doujie-oauth?label=release" alt="Release"></a>
   <a href="https://github.com/wangxiaoshuai136/doujie-oauth/actions/workflows/build.yml"><img src="https://github.com/wangxiaoshuai136/doujie-oauth/actions/workflows/build.yml/badge.svg" alt="CI"></a>
-  <img src="https://img.shields.io/badge/CLIProxyAPI-v8+-4f46e5" alt="CLIProxyAPI v8+">
+  <img src="https://img.shields.io/badge/CLIProxyAPI-v8.0.49%2B-4f46e5" alt="CLIProxyAPI v8.0.49+">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license">
 </p>
 
@@ -21,7 +21,7 @@
 </p>
 
 Doujie OAuth 为 CLIProxyAPI 增加 `doubao` provider。在面板中显式选择国内版或
-Dola 国际版入口并完成扫码后，CPA 即获得模型发现、Anthropic Messages、OpenAI Chat
+Dola 国际版入口并完成登录后，CPA 即获得模型发现、Anthropic Messages、OpenAI Chat
 Completions、OpenAI Responses 原生执行，以及标准化配额与重置卡能力——无需本地
 常驻浏览器，也无需企业级命令行客户端。
 
@@ -29,7 +29,7 @@ Completions、OpenAI Responses 原生执行，以及标准化配额与重置卡�
 > 本项目仅供开源学习与技术交流，禁止商业或非法用途。项目与相关公司及商标无隶属、
 > 认可或背书关系；使用本项目产生的一切后果由使用者自行承担。完整声明见文末。
 
-## 两个扫码门户，一个 provider
+## 两个登录入口，一个 provider
 
 国内版与 Dola 国际版产生同一种凭证（`"type": "doubao"`）并共用同一个 executor，
 但登录站点、请求参数和图标不同，因此注册为两个独立的 OAuth 入口，而不是根据 IP
@@ -40,6 +40,9 @@ Completions、OpenAI Responses 原生执行，以及标准化配额与重置卡�
 | 豆姐（国内版） | `doubao` | 默认国内站点，使用 `assets/doubao.png` |
 | 豆姐国际版（Dola） | `dola` | 独立国际站点，使用 `assets/dola.png`；受上游地区策略影响 |
 | 豆姐（桌面端导入） | `doubao-desktop` | Windows 本地会话无感导入，归入国内凭证 |
+
+扫码不是必选项。桌面端入口无需手机；若豆包客户端正在运行并占用 Cookies 数据库，
+插件会自动打开免扫码导入页：从托盘完全退出豆包后，在页面上重试即可。
 
 在支持逐入口元数据的面板（CPA v8.0.51+）上，每个入口各自成为一张卡片，带自己的
 名称和图标。选入口即选站点；插件不会自动切换地区。
@@ -61,6 +64,7 @@ OAuth 发起和轮询使用 CPA 原生受认证管理 API，公共插件资源�
 
 - 豆姐国内版与 Dola 国际版两个独立扫码入口，默认国内版，从不自动换区。
 - Windows 桌面端会话导入，避免手机端与桌面端账号不一致。
+- 桌面 Cookies 被占用时提供免扫码重试页。
 - 原生 Anthropic Messages、OpenAI Chat Completions、OpenAI Responses 执行。
 - 深度思考与思维链流式回传。
 - 真实 `5h` / `7d` 配额窗口、重置时间与额度重置卡核销。
@@ -139,7 +143,7 @@ doujie-oauth_<version>_linux_arm64.zip
 doujie-oauth_<version>_darwin_amd64.zip
 doujie-oauth_<version>_darwin_arm64.zip
 doujie-oauth_<version>_windows_amd64.zip
-*.zip.sha256
+checksums.txt
 ```
 
 每个压缩包内含命名正确的 `doujie-oauth.so`、`doujie-oauth.dylib` 或

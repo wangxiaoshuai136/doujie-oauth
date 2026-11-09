@@ -22,6 +22,17 @@ func TestDecodeQRCode(t *testing.T) {
 	}
 }
 
+func TestAbsoluteBaseUsesHostOriginForCallbackURL(t *testing.T) {
+	got := absoluteBase("", "http://127.0.0.1:8317/v8/management/oauth/callback")
+	if got != "http://127.0.0.1:8317" {
+		t.Fatalf("callback URL origin = %q", got)
+	}
+	got = absoluteBase("https://cpa.example.com/doujie", "http://127.0.0.1:8317/v8/management/oauth/callback")
+	if got != "https://cpa.example.com/doujie" {
+		t.Fatalf("public base override = %q", got)
+	}
+}
+
 func TestMergeCookies(t *testing.T) {
 	jar := map[string]string{}
 	headers := http.Header{}
@@ -129,7 +140,7 @@ func TestStartLoginGlobalUsesDolaFlow(t *testing.T) {
 	}}
 	resp, err := startLogin(pluginapi.AuthLoginStartRequest{
 		Provider: internationalEntryID,
-		BaseURL:  "http://127.0.0.1:8317",
+		BaseURL:  "http://127.0.0.1:8317/v8/management/oauth/callback",
 		Host:     pluginapi.HostConfigSummary{AuthDir: dir},
 	}, sender)
 	if err != nil {
@@ -151,5 +162,8 @@ func TestStartLoginGlobalUsesDolaFlow(t *testing.T) {
 	}
 	if !strings.Contains(sender.requests[2].Headers.Get("Cookie"), "passport_csrf_token=csrf") {
 		t.Fatalf("CSRF cookie not forwarded: %q", sender.requests[2].Headers.Get("Cookie"))
+	}
+	if resp.URL != "http://127.0.0.1:8317"+resourcePrefix+"/qr.png" {
+		t.Fatalf("QR URL = %q", resp.URL)
 	}
 }

@@ -1,5 +1,5 @@
 PLUGIN_ID ?= doujie-oauth
-VERSION ?= 0.1.1
+VERSION ?= 0.1.3
 GOOS ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)
 EXT = $(if $(filter darwin,$(GOOS)),dylib,$(if $(filter windows,$(GOOS)),dll,so))
@@ -8,11 +8,11 @@ LDFLAGS = -s -w -X main.pluginVersion=$(VERSION)
 .PHONY: test vet build package clean
 
 test:
-	cd go && go test ./...
-	cd go && go vet ./...
+	cd go && CGO_ENABLED=1 go test ./...
+	cd go && CGO_ENABLED=1 go vet ./...
 
 vet:
-	cd go && go vet ./...
+	cd go && CGO_ENABLED=1 go vet ./...
 
 build:
 	mkdir -p dist
@@ -20,8 +20,8 @@ build:
 	rm -f dist/$(PLUGIN_ID).h
 
 package: build
-	cd dist && zip -r $(PLUGIN_ID)_$(VERSION)_$(GOOS)_$(GOARCH).zip $(PLUGIN_ID).$(EXT) ../README.md ../README.zh-CN.md ../LICENSE
-	python3 -c "import hashlib,sys; p='dist/$(PLUGIN_ID)_$(VERSION)_$(GOOS)_$(GOARCH).zip'; print(hashlib.sha256(open(p,'rb').read()).hexdigest()+'  '+p)" > dist/$(PLUGIN_ID)_$(VERSION)_$(GOOS)_$(GOARCH).zip.sha256
+	cd dist && python3 -c "import sys,zipfile; z=zipfile.ZipFile(sys.argv[1], 'w', zipfile.ZIP_DEFLATED); [z.write(p, p.split('/')[-1]) for p in sys.argv[2:]]; z.close()" $(PLUGIN_ID)_$(VERSION)_$(GOOS)_$(GOARCH).zip $(PLUGIN_ID).$(EXT) ../README.md ../README.zh-CN.md ../LICENSE
+	cd dist && python3 -c "import hashlib,glob; p=glob.glob('$(PLUGIN_ID)_$(VERSION)_$(GOOS)_$(GOARCH).zip')[0]; open('checksums.txt','w').write(hashlib.sha256(open(p,'rb').read()).hexdigest()+'  '+p+'\\n')"
 
 clean:
 	rm -rf dist

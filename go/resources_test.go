@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -44,5 +45,24 @@ func TestManagementServesLogoAndDescriptor(t *testing.T) {
 	resp, _ := handleManagementResource(pluginapi.ManagementRequest{Method: "POST", Path: resourcePrefix + "/logo.png"})
 	if resp.StatusCode != 405 {
 		t.Fatalf("expected method not allowed, got %d", resp.StatusCode)
+	}
+}
+
+func TestManualImportPageAndCompletion(t *testing.T) {
+	token := strings.Repeat("a", 32)
+	flowID := strings.Repeat("b", 32)
+	putFlow(flowID, &loginFlow{Expires: time.Now().Add(time.Minute), ImportToken: token})
+	defer takeFlow(flowID)
+
+	path := resourcePrefix + "/manual.html"
+	resp, err := handleManagementResource(pluginapi.ManagementRequest{Method: "GET", Path: path, Query: url.Values{"token": {token}}})
+	if err != nil || resp.StatusCode != 200 || !bytes.Contains(resp.Body, []byte("重新读取桌面端")) || !bytes.Contains(resp.Body, []byte("action=desktop")) {
+		t.Fatalf("manual page: %d %v %q", resp.StatusCode, err, resp.Body)
+	}
+	if err = completeDesktopImportFromCookies(token, map[string]string{"sessionid": "abc", "ttwid": "def"}); err != nil {
+		t.Fatal(err)
+	}
+	if flow := manualImportFlow(token); flow == nil || flow.Imported == nil || flow.Imported.Provider != credentialProvider {
+		t.Fatalf("manual import did not complete: %+v", flow)
 	}
 }
