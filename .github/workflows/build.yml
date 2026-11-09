@@ -44,7 +44,7 @@ jobs:
           - { runner: ubuntu-24.04, goos: linux, goarch: amd64, ext: so }
           - { runner: ubuntu-24.04-arm, goos: linux, goarch: arm64, ext: so }
           - { runner: macos-15-intel, goos: darwin, goarch: amd64, ext: dylib }
-          - { runner: macos-15, goos: darwin, goarch: arm64, ext: dylib }
+          - { runner: macos-14, goos: darwin, goarch: arm64, ext: dylib }
           - { runner: windows-latest, goos: windows, goarch: amd64, ext: dll }
     steps:
       - uses: actions/checkout@v4
@@ -60,7 +60,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          version="0.1.4"
+          version="0.1.5"
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             version="${GITHUB_REF_NAME#v}"
           fi
