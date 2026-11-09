@@ -1,7 +1,6 @@
 [CmdletBinding()]
 param(
   [string]$AuthDir = 'D:\WenPaul\Documents\路由网关\EasyCLIProxyAPI\oauth',
-  [string]$AppPath = 'D:\Doubao\app\Doubao.exe',
   [string]$LogDir = 'D:\WenPaul\Documents\豆包REA\outputs\daily-credit'
 )
 
@@ -10,19 +9,7 @@ New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
 $stamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
 $lines = [System.Collections.Generic.List[string]]::new()
 $lines.Add("[$stamp] daily Doubao credit check")
-
-$running = @(Get-Process -Name Doubao -ErrorAction SilentlyContinue)
-if ($running.Count -eq 0) {
-  if (-not (Test-Path -LiteralPath $AppPath)) {
-    $lines.Add("ERROR desktop app not found: $AppPath")
-  } else {
-    [System.Diagnostics.Process]::Start($AppPath) | Out-Null
-    Start-Sleep -Seconds 5
-    $lines.Add('desktop app launched')
-  }
-} else {
-  $lines.Add("desktop app already running (pid=$($running[0].Id))")
-}
+$lines.Add('desktop client launch disabled; status-only mode')
 
 $accounts = @(Get-ChildItem -LiteralPath $AuthDir -File -Filter 'doubao*.json' | Sort-Object Name)
 if ($accounts.Count -eq 0) {

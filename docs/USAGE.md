@@ -139,15 +139,15 @@ user sessions:
 - Falls back to local request-count estimation for free-tier accounts lacking
   server-side subscription windows.
 
-## 6.1 Daily Desktop Credit Check
+## 6.1 Daily Credit Status Check
 
-`scripts/daily_doubao_credit.ps1` starts the Doubao desktop client when it is not
-running, then reads the daily App/desktop credit tasks for every `doubao*.json`
-credential under the configured auth directory. It writes an owner-local daily
-log under `outputs/daily-credit/` without printing cookies.
+`scripts/daily_doubao_credit.ps1` reads the daily App/desktop credit tasks for
+every `doubao*.json` credential under the configured auth directory. It does not
+start or require a local desktop client and writes an owner-local daily log under
+`outputs/daily-credit/` without printing cookies.
 
-The App task still requires a real mobile-app login; this script only automates
-the desktop launch and reports status for all accounts.
+The App task still requires a real mobile-app login. The desktop task status is
+reported as returned by the server; the script does not fabricate a client login.
 
 ## 7. Troubleshooting
 
