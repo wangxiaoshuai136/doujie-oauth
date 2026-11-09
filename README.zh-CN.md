@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.png" width="96" height="96" alt="OMC Doujie OAuth logo">
+  <img src="assets/logo.png" width="128" height="172" alt="OMC Doujie OAuth logo">
 </p>
 
 <h1 align="center">OMC Doujie OAuth</h1>
