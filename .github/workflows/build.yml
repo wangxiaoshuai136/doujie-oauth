@@ -11,8 +11,8 @@ permissions:
   contents: write
 
 env:
-  PLUGIN_ID: omc-doubao-oauth
-  VERSION: 0.1.0
+  PLUGIN_ID: doujie-oauth
+  VERSION: 0.1.1
 
 jobs:
   test:

@@ -2,7 +2,7 @@
 
 ## 1. Install the Library
 
-Build or download `omc-doubao-oauth.{dll,dylib,so}` and place it in the directory
+Build or download `doujie-oauth.{dll,dylib,so}` and place it in the directory
 CPA scans for plugins (`plugins.dir`). Enable the plugin in `config.yaml`:
 
 ```yaml
@@ -10,7 +10,7 @@ plugins:
   enabled: true
   dir: /path/to/plugins
   configs:
-    omc-doubao-oauth:
+    doujie-oauth:
       enabled: true
       endpoint: samantha
       signer: none
@@ -43,7 +43,7 @@ The plugin does not auto-detect regions. Choose either **豆姐（国内版）**
 
 1. Open the panel's plugin / OAuth page and select the desired entry.
 2. The panel renders a QR image served by the plugin at
-   `/v0/resource/plugins/omc-doubao-oauth/qr.png` (or base64 metadata).
+   `/v0/resource/plugins/doujie-oauth/qr.png` (or base64 metadata).
 3. Scan it with the mobile app and confirm authorization.
 4. The plugin completes the session handshake and writes a `doubao` auth file.
 

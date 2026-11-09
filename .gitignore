@@ -1,6 +1,6 @@
 /dist/
 /build/
-/go/omc-doubao-oauth.*
+/go/doujie-oauth.*
 *.dll
 *.so
 *.dylib

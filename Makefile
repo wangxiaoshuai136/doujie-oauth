@@ -1,5 +1,5 @@
-PLUGIN_ID ?= omc-doubao-oauth
-VERSION ?= 0.1.0
+PLUGIN_ID ?= doujie-oauth
+VERSION ?= 0.1.1
 GOOS ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)
 EXT = $(if $(filter darwin,$(GOOS)),dylib,$(if $(filter windows,$(GOOS)),dll,so))

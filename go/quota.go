@@ -137,7 +137,7 @@ func authLabel(storage []byte) string {
 func quotaDescription() pluginapi.QuotaDescribeResponse {
 	return pluginapi.QuotaDescribeResponse{
 		SupportedProviders: []string{credentialProvider},
-		DisplayName:        "OMC Doujie",
+		DisplayName:        "Doujie",
 		SupportsReset:      true,
 	}
 }

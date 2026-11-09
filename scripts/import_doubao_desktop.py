@@ -3,7 +3,7 @@
 
 Windows only. Reads the desktop client's Chromium cookie store, decrypts the
 v10 values with the DPAPI-protected key from Local State, and writes a
-`doubao` auth file that the OMC Doubao OAuth plugin can use.
+`doubao` auth file that the Doujie OAuth plugin can use.
 
 Requires: Python 3.10+ and `cryptography` (`uv pip install --system
 --break-system-packages cryptography`).

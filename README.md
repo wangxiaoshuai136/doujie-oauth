@@ -1,17 +1,8 @@
 <p align="center">
-  <img src="assets/logo.png" width="96" height="96" alt="OMC Doujie OAuth logo">
+  <img src="assets/logo.png" width="96" height="96" alt="Doujie OAuth logo">
 </p>
 
-<h1 align="center">OMC Doujie OAuth</h1>
-
-<p align="center">
-  <a href="https://github.com/WizisCool/oh-my-cpa">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/WizisCool/oh-my-cpa/main/web/src/assets/brand/omc-wordmark-dark.svg">
-      <img src="https://raw.githubusercontent.com/WizisCool/oh-my-cpa/main/web/src/assets/brand/omc-wordmark-light.svg" alt="Oh-My-CPA" height="22">
-    </picture>
-  </a>
-</p>
+<h1 align="center">Doujie OAuth</h1>
 
 <p align="center">
   Explicit Doujie domestic and Dola international sign-in entries for
@@ -19,8 +10,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/wangxiaoshuai136/omc-doubao-oauth/releases"><img src="https://img.shields.io/github/v/release/wangxiaoshuai136/omc-doubao-oauth?label=release" alt="Release"></a>
-  <a href="https://github.com/wangxiaoshuai136/omc-doubao-oauth/actions/workflows/build.yml"><img src="https://github.com/wangxiaoshuai136/omc-doubao-oauth/actions/workflows/build.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/wangxiaoshuai136/doujie-oauth/releases"><img src="https://img.shields.io/github/v/release/wangxiaoshuai136/doujie-oauth?label=release" alt="Release"></a>
+  <a href="https://github.com/wangxiaoshuai136/doujie-oauth/actions/workflows/build.yml"><img src="https://github.com/wangxiaoshuai136/doujie-oauth/actions/workflows/build.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/CLIProxyAPI-v8+-4f46e5" alt="CLIProxyAPI v8+">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license">
 </p>
@@ -29,7 +20,7 @@
   <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a>
 </p>
 
-OMC Doujie OAuth adds the `doubao` provider to CLIProxyAPI. After you explicitly
+Doujie OAuth adds the `doubao` provider to CLIProxyAPI. After you explicitly
 choose the domestic or Dola international entry and finish QR sign-in, CPA gains
 model discovery, native Anthropic Messages, OpenAI Chat Completions and OpenAI
 Responses execution, plus normalized quota and reset-card support — no local
@@ -68,8 +59,7 @@ plugin never switches regions automatically.
 
 Everything user-facing is rendered by the host: OAuth tiles, config fields,
 static assets and quota views all go through CPA's plugin ABI and management
-API. The plugin is first-class in
-[Oh-My-CPA](https://github.com/WizisCool/oh-my-cpa) and works the same in CPA's
+API. The plugin works the same in CPA's
 own Management Center or any other panel that speaks CPA's management API.
 
 OAuth start and polling use CPA's authenticated management API. Public plugin
@@ -108,7 +98,7 @@ Model IDs containing `think` or `reason` enable deep thinking automatically;
 ## Installation
 
 Download the archive for your platform from
-[Releases](https://github.com/wangxiaoshuai136/omc-doubao-oauth/releases), place
+[Releases](https://github.com/wangxiaoshuai136/doujie-oauth/releases), place
 the shared library in CPA's plugin directory, then enable it in `config.yaml`:
 
 ```yaml
@@ -116,7 +106,7 @@ plugins:
   enabled: true
   dir: /path/to/plugins
   configs:
-    omc-doubao-oauth:
+    doujie-oauth:
       enabled: true
       endpoint: samantha
       signer: none
@@ -124,7 +114,7 @@ plugins:
       # public_base_url: https://cpa.example.com
 ```
 
-The store and shared-library name is `omc-doubao-oauth`; the CPA credential
+The store and shared-library name is `doujie-oauth`; the CPA credential
 provider identifier remains `doubao`. See
 [docs/USAGE.md](docs/USAGE.md) for login, configuration, quota and
 troubleshooting.
@@ -159,16 +149,16 @@ GOPROXY=off GOSUMDB=off go vet ./...
 CI builds these release artifacts from a tag:
 
 ```text
-omc-doubao-oauth_<version>_linux_amd64.zip
-omc-doubao-oauth_<version>_linux_arm64.zip
-omc-doubao-oauth_<version>_darwin_amd64.zip
-omc-doubao-oauth_<version>_darwin_arm64.zip
-omc-doubao-oauth_<version>_windows_amd64.zip
+doujie-oauth_<version>_linux_amd64.zip
+doujie-oauth_<version>_linux_arm64.zip
+doujie-oauth_<version>_darwin_amd64.zip
+doujie-oauth_<version>_darwin_arm64.zip
+doujie-oauth_<version>_windows_amd64.zip
 *.zip.sha256
 ```
 
-Each archive contains the correctly named `omc-doubao-oauth.so`,
-`omc-doubao-oauth.dylib` or `omc-doubao-oauth.dll`. Local native builds use
+Each archive contains the correctly named `doujie-oauth.so`,
+`doujie-oauth.dylib` or `doujie-oauth.dll`. Local native builds use
 `make build`; `make package` creates the same archive format.
 
 ## Project layout

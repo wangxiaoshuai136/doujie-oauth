@@ -1,17 +1,8 @@
 <p align="center">
-  <img src="assets/logo.png" width="96" height="96" alt="OMC Doujie OAuth logo">
+  <img src="assets/logo.png" width="96" height="96" alt="Doujie OAuth logo">
 </p>
 
-<h1 align="center">OMC Doujie OAuth</h1>
-
-<p align="center">
-  <a href="https://github.com/WizisCool/oh-my-cpa">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/WizisCool/oh-my-cpa/main/web/src/assets/brand/omc-wordmark-dark.svg">
-      <img src="https://raw.githubusercontent.com/WizisCool/oh-my-cpa/main/web/src/assets/brand/omc-wordmark-light.svg" alt="Oh-My-CPA" height="22">
-    </picture>
-  </a>
-</p>
+<h1 align="center">Doujie OAuth</h1>
 
 <p align="center">
   为 <a href="https://github.com/router-for-me/CLIProxyAPI">CLIProxyAPI</a>
@@ -19,8 +10,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/wangxiaoshuai136/omc-doubao-oauth/releases"><img src="https://img.shields.io/github/v/release/wangxiaoshuai136/omc-doubao-oauth?label=release" alt="Release"></a>
-  <a href="https://github.com/wangxiaoshuai136/omc-doubao-oauth/actions/workflows/build.yml"><img src="https://github.com/wangxiaoshuai136/omc-doubao-oauth/actions/workflows/build.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/wangxiaoshuai136/doujie-oauth/releases"><img src="https://img.shields.io/github/v/release/wangxiaoshuai136/doujie-oauth?label=release" alt="Release"></a>
+  <a href="https://github.com/wangxiaoshuai136/doujie-oauth/actions/workflows/build.yml"><img src="https://github.com/wangxiaoshuai136/doujie-oauth/actions/workflows/build.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/CLIProxyAPI-v8+-4f46e5" alt="CLIProxyAPI v8+">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license">
 </p>
@@ -29,7 +20,7 @@
   <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a>
 </p>
 
-OMC Doujie OAuth 为 CLIProxyAPI 增加 `doubao` provider。在面板中显式选择国内版或
+Doujie OAuth 为 CLIProxyAPI 增加 `doubao` provider。在面板中显式选择国内版或
 Dola 国际版入口并完成扫码后，CPA 即获得模型发现、Anthropic Messages、OpenAI Chat
 Completions、OpenAI Responses 原生执行，以及标准化配额与重置卡能力——无需本地
 常驻浏览器，也无需企业级命令行客户端。
@@ -60,9 +51,8 @@ Completions、OpenAI Responses 原生执行，以及标准化配额与重置卡�
 ## 面板无关
 
 所有面向用户的部分都由宿主渲染：OAuth 卡片、配置字段、静态资源和配额视图都通过
-CPA 的插件 ABI 与管理 API 呈现。插件在 [Oh-My-CPA](https://github.com/WizisCool/oh-my-cpa)
-中是一等公民，在 CPA 自带的 Management Center 或任何对接 CPA 管理 API 的面板中
-表现一致。
+CPA 的插件 ABI 与管理 API 呈现。插件在 CPA 自带的 Management Center 或任何对接
+CPA 管理 API 的面板中表现一致。
 
 OAuth 发起和轮询使用 CPA 原生受认证管理 API，公共插件资源仅提供静态 Logo 与可选
 描述声明。插件不需要本地回调监听器，也不依赖独立浏览器进程。
@@ -96,7 +86,7 @@ OAuth 发起和轮询使用 CPA 原生受认证管理 API，公共插件资源�
 
 ## 安装
 
-从 [Releases](https://github.com/wangxiaoshuai136/omc-doubao-oauth/releases) 下载对应
+从 [Releases](https://github.com/wangxiaoshuai136/doujie-oauth/releases) 下载对应
 平台的压缩包，将共享库放入 CPA 的插件目录，然后在 `config.yaml` 中启用：
 
 ```yaml
@@ -104,7 +94,7 @@ plugins:
   enabled: true
   dir: /path/to/plugins
   configs:
-    omc-doubao-oauth:
+    doujie-oauth:
       enabled: true
       endpoint: samantha
       signer: none
@@ -112,7 +102,7 @@ plugins:
       # public_base_url: https://cpa.example.com
 ```
 
-商店与共享库名称为 `omc-doubao-oauth`；CPA 凭证 provider 标识保持为 `doubao`。
+商店与共享库名称为 `doujie-oauth`；CPA 凭证 provider 标识保持为 `doubao`。
 登录、配置、配额与故障排查见 [docs/USAGE.md](docs/USAGE.md)。
 
 推送 `v*` 标签时由 GitHub Actions 创建发布。
@@ -144,16 +134,16 @@ GOPROXY=off GOSUMDB=off go vet ./...
 CI 从标签构建以下发布产物：
 
 ```text
-omc-doubao-oauth_<version>_linux_amd64.zip
-omc-doubao-oauth_<version>_linux_arm64.zip
-omc-doubao-oauth_<version>_darwin_amd64.zip
-omc-doubao-oauth_<version>_darwin_arm64.zip
-omc-doubao-oauth_<version>_windows_amd64.zip
+doujie-oauth_<version>_linux_amd64.zip
+doujie-oauth_<version>_linux_arm64.zip
+doujie-oauth_<version>_darwin_amd64.zip
+doujie-oauth_<version>_darwin_arm64.zip
+doujie-oauth_<version>_windows_amd64.zip
 *.zip.sha256
 ```
 
-每个压缩包内含命名正确的 `omc-doubao-oauth.so`、`omc-doubao-oauth.dylib` 或
-`omc-doubao-oauth.dll`。本地原生构建使用 `make build`，`make package` 生成相同格式。
+每个压缩包内含命名正确的 `doujie-oauth.so`、`doujie-oauth.dylib` 或
+`doujie-oauth.dll`。本地原生构建使用 `make build`，`make package` 生成相同格式。
 
 ## 项目结构
 

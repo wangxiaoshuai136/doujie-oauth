@@ -1,6 +1,6 @@
 # NOTICE
 
-OMC Doubao OAuth is an independent, unofficial integration. It is not
+Doujie OAuth is an independent, unofficial integration. It is not
 affiliated with, endorsed by, or sponsored by ByteDance.
 
 "Doubao", "豆包" and related marks are trademarks of ByteDance or its

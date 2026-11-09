@@ -1,4 +1,4 @@
-module github.com/wangxiaoshuai136/omc-doubao-oauth
+module github.com/wangxiaoshuai136/doujie-oauth
 
 go 1.27.0
 

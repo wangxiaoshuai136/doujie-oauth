@@ -7,9 +7,9 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
 )
 
-const pluginStoreID = "omc-doubao-oauth"
+const pluginStoreID = "doujie-oauth"
 const resourcePrefix = "/v0/resource/plugins/" + pluginStoreID
-const publicLogoBaseURL = "https://raw.githubusercontent.com/wangxiaoshuai136/omc-doubao-oauth/refs/heads/main/assets/"
+const publicLogoBaseURL = "https://raw.githubusercontent.com/wangxiaoshuai136/doujie-oauth/refs/heads/main/assets/"
 
 func resourceAssetURL(name string) string {
 	switch name {
@@ -47,8 +47,8 @@ func handleManagementResource(req pluginapi.ManagementRequest) (pluginapi.Manage
 		body = doubaoPNG
 	case req.Path == resourcePrefix+"/dola.png":
 		body = dolaPNG
-	case req.Path == omcResourcePath:
-		body = []byte(omcDescriptorJSON)
+	case req.Path == descriptorResourcePath:
+		body = []byte(descriptorJSON)
 		contentType = "application/json; charset=utf-8"
 		cacheControl = "no-cache"
 	case req.Path == resourcePrefix+"/imported.html":

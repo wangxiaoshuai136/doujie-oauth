@@ -8,7 +8,7 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
 )
 
-var pluginVersion = "0.1.0"
+var pluginVersion = "0.1.1"
 
 type rpcAuthStart struct {
 	pluginapi.AuthLoginStartRequest
@@ -55,10 +55,10 @@ func registration() any {
 	return map[string]any{
 		"schema_version": pluginabi.SchemaVersion,
 		"metadata": pluginapi.Metadata{
-			Name:             "OMC Doujie OAuth",
+			Name:             "Doujie OAuth",
 			Version:          pluginVersion,
 			Author:           "wangxiaoshuai136",
-			GitHubRepository: "https://github.com/wangxiaoshuai136/omc-doubao-oauth",
+			GitHubRepository: "https://github.com/wangxiaoshuai136/doujie-oauth",
 			Logo:             resourceAssetURL("logo.png"),
 			ConfigFields: []pluginapi.ConfigField{
 				{Name: "max_concurrency", Type: pluginapi.ConfigFieldTypeInteger, Description: "Maximum simultaneous requests per credential (default 3)."},
@@ -147,7 +147,7 @@ func handleMethod(method string, raw []byte) (any, error) {
 			{"path": "/imported.html", "menu": "", "description": "Desktop import result page."},
 			{"path": "/doubao.png", "menu": "", "description": "Domestic sign-in logo."},
 			{"path": "/dola.png", "menu": "", "description": "International sign-in logo."},
-			{"path": "/omc.json", "menu": "", "description": "Public, optional OMC plugin declaration."},
+			{"path": "/doujie.json", "menu": "", "description": "Public plugin declaration."},
 		}}, nil
 	case "management.handle":
 		var req pluginapi.ManagementRequest
