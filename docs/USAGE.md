@@ -1,4 +1,4 @@
-# Operator Guide
+﻿# Operator Guide
 
 ## 1. Install the Library
 
@@ -25,7 +25,7 @@ URL to the plugin. It is used to build the QR image address.
 
 ### Option A: Desktop Session Import (Recommended)
 
-1. Open the panel's plugin / OAuth page and choose **豆包（桌面端导入）**.
+1. Open the panel's plugin / OAuth page and choose **豆姐（桌面端导入）**.
 2. The plugin reads the local Windows desktop client session and writes an auth
    credential immediately.
 3. No mobile scanning required, ensuring the imported account matches your
@@ -39,7 +39,7 @@ python scripts/import_doubao_desktop.py --auth-dir "path/to/cpa/oauth"
 
 ### Option B: Mobile QR Sign-In
 
-1. Open the panel's plugin / OAuth page and select `豆包`.
+1. Open the panel's plugin / OAuth page and select `豆姐`.
 2. The panel renders a QR image served by the plugin at
    `/v0/resource/plugins/omc-doubao-oauth/qr.png` (or base64 metadata).
 3. Scan it with the mobile app and confirm authorization.

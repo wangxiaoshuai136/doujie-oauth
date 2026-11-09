@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="assets/logo.png" width="96" height="96" alt="OMC Doubao OAuth logo">
+  <img src="assets/logo.png" width="96" height="96" alt="OMC Doujie OAuth logo">
 </p>
 
-<h1 align="center">OMC Doubao OAuth</h1>
+<h1 align="center">OMC Doujie OAuth</h1>
 
 <p align="center">
-  为 <a href="https://github.com/router-for-me/CLIProxyAPI">CLIProxyAPI (CPA)</a> 打造的高性能非官方豆包（Doubao）Provider 插件
+  为 <a href="https://github.com/router-for-me/CLIProxyAPI">CLIProxyAPI (CPA)</a> 打造的高性能非官方「豆姐（Doujie）」Provider 插件
 </p>
 
 <p align="center">
@@ -19,12 +19,12 @@
   简体中文 · <a href="README.md">English</a>
 </p>
 
-OMC Doubao OAuth 为 CLIProxyAPI 扩展了 `doubao` 提供商能力。通过移动端扫码或本地桌面端会话无感导入，即可在 CPA 中无缝调用豆包全系列大语言模型。
+OMC Doujie OAuth 为 CLIProxyAPI 扩展了“豆姐”系列对话模型提供商能力。通过移动端扫码或本地桌面端会话无感导入，即可在 CPA 中无缝调用全系列对话模型。
 
 插件**原生直通 Anthropic Messages、OpenAI Chat Completions 与 OpenAI Responses 三大主流协议**，支持思维链深度流式回传、官方实时订阅配额读取以及额度重置卡在线核销。全程无需本地常驻浏览器，无需开通企业级命令行工具，且避免了网关层多次协议转换可能带来的格式损耗。
 
 > [!NOTE]
-> 本项目为开源第三方实现，与北京字节跳动科技有限公司无关联。请参阅 [NOTICE.md](NOTICE.md) 与文末免责声明。
+> 本项目为开源第三方实现，项目代号“豆姐”（Doujie），旨在划清商标界限并提供通用的多协议本地网关支持。本项目与北京字节跳动科技有限公司无任何隶属、认可或背书关系。请参阅 [NOTICE.md](NOTICE.md) 与文末免责声明。
 
 ---
 
@@ -33,7 +33,7 @@ OMC Doubao OAuth 为 CLIProxyAPI 扩展了 `doubao` 提供商能力。通过移�
 - ⚡ **原生三协议直通架构**：在插件执行器内完整声明并实现 Claude、OpenAI 与 OpenAI Response 格式，由 CPA 核心直派请求，杜绝网关层中间转换带来的信息截断或延迟。
 - 🧠 **思维链与深度思考完整回传**：全面适配深度思考与推理能力（CoT）。Claude `thinking` 块、OpenAI `reasoning_content` 及 Responses `reasoning` 摘要均可平滑流式输出。
 - 🔑 **双形态登录鉴权体系**：
-  - **App 扫码登录 (`doubao`)**：CPA 面板直接渲染二维码，手机端 App 扫码一键授权。
+  - **App 扫码登录 (`doubao`)**：CPA 面板直接渲染二维码，移动端扫码一键授权。
   - **Windows 桌面端无感导入 (`doubao-desktop`)**：一键自动读取本地已登录的桌面客户端会话，免除扫码步骤，彻底避免手机端与电脑端账号不一致的问题。另提供独立无头 Python 脚本支持服务器环境。
 - 📊 **官方订阅配额与重置卡联动**：
   - 自动同步官方订阅额度与配额重置卡信息（基于已授权的用户会话安全直连，无需额外服务）。
@@ -52,14 +52,14 @@ OMC Doubao OAuth 为 CLIProxyAPI 扩展了 `doubao` 提供商能力。通过移�
 
 | 模型标识 (Model ID) | 显示名称 | 上下文 / 输出限制 | 深度思考 (Deep Think) | 特性说明 |
 | --- | --- | --- | --- | --- |
-| `doubao` | 豆包 Auto | 256k / 32k | 自动适配 | 默认智能路由模型 |
-| `doubao-seed-2.0` | 豆包 Seed 2.0 | 256k / 32k | 自动适配 | 综合能力最强的主力通用模型 |
-| `doubao-seed-2.0-lite` | 豆包 Seed 2.0 Lite | 256k / 32k | 支持 | 低延迟、轻量化响应版本 |
-| `doubao-seed-2.0-code` | 豆包 Seed 2.0 Code | 256k / 32k | 支持 | 针对编程辅助与代码生成特化 |
-| `doubao-seed-1.6` | 豆包 Seed 1.6 | 256k / 32k | 支持 | 经典 1.6 代际标准模型 |
-| `doubao-seed-1.6-thinking` | 豆包 Seed 1.6 思考 | 256k / 32k | **默认开启** | 深度推理 / 思维链增强特化模型 |
-| `doubao-seed-1.6-flash` | 豆包 Seed 1.6 Flash | 256k / 32k | 支持 | 高吞吐、极速响应版本 |
-| `doubao-pro` | 豆包 Pro | 128k / 16k | 支持 | 经典 Pro 模型 |
+| `doubao` | 豆姐 Auto | 256k / 32k | 自动适配 | 默认智能路由模型 |
+| `doubao-seed-2.0` | 豆姐 Seed 2.0 | 256k / 32k | 自动适配 | 综合能力最强的主力通用模型 |
+| `doubao-seed-2.0-lite` | 豆姐 Seed 2.0 Lite | 256k / 32k | 支持 | 低延迟、轻量化响应版本 |
+| `doubao-seed-2.0-code` | 豆姐 Seed 2.0 Code | 256k / 32k | 支持 | 针对编程辅助与代码生成特化 |
+| `doubao-seed-1.6` | 豆姐 Seed 1.6 | 256k / 32k | 支持 | 经典 1.6 代际标准模型 |
+| `doubao-seed-1.6-thinking` | 豆姐 Seed 1.6 思考 | 256k / 32k | **默认开启** | 深度推理 / 思维链增强特化模型 |
+| `doubao-seed-1.6-flash` | 豆姐 Seed 1.6 Flash | 256k / 32k | 支持 | 高吞吐、极速响应版本 |
+| `doubao-pro` | 豆姐 Pro | 128k / 16k | 支持 | 经典 Pro 模型 |
 
 > **提示**：当请求的模型标识中包含 `think` 或 `reason` 时，插件会自动启用深度推理。也可以在配置文件中指定 `deep_think: true` 强制全局开启。
 
@@ -123,7 +123,7 @@ plugins:
 ### 方式 A：Windows 桌面端无感导入（推荐）
 
 如果你的电脑上已安装并登录了官方 Windows 桌面客户端：
-1. 打开 CPA 管理面板，在 OAuth / 插件登录列表中找到 **豆包（桌面端导入）**。
+1. 打开 CPA 管理面板，在 OAuth / 插件登录列表中找到 **豆姐（桌面端导入）**。
 2. 点击后，插件将直接读取本机桌面客户端已登录会话并自动写入凭据。
 3. 导入秒级完成，无需手机扫码，彻底保证导入的账号与桌面端保持一致（包含已开通的会员/体验套餐与重置卡）。
 
@@ -134,7 +134,7 @@ plugins:
 
 ### 方式 B：App 扫码登录
 
-1. 打开 CPA 管理面板，点击 **豆包** 登录项。
+1. 打开 CPA 管理面板，点击 **豆姐** 登录项。
 2. 面板将呈现安全登录二维码（也可通过 `/v0/resource/plugins/omc-doubao-oauth/qr.png` 访问）。
 3. 使用手机端 App 扫码并确认登录，插件自动捕获会话并持久化至 CPA 凭据库。
 
@@ -238,7 +238,7 @@ for chunk in response:
 | --- | --- | --- |
 | `401 reauth_required` | 登录凭据过期或已在其他终端失效 | 删除失效的 auth 文件，重新扫码或通过桌面端重新导入 |
 | `429 quota_exhausted` | 触发账号频控或本周期配额已耗尽 | 检查 7d/5h 额度重置时间；或在面板点击「Reset Quota」核销一张重置卡 |
-| 扫码后发现不是会员号 | 手机端登录账号与电脑桌面端不一致 | 推荐改用 **豆包（桌面端导入）**，直接无感同步桌面端的会员登录态 |
+| 扫码后发现不是会员号 | 手机端登录账号与电脑桌面端不一致 | 推荐改用 **豆姐（桌面端导入）**，直接无感同步桌面端的会员登录态 |
 | 额度面板未显示 5h 桶 | 官方按不同订阅计划划分策略 | 部分会员或体验计划只提供 7 天滚动额度池，有 5h 策略时会自动显示 |
 | `502 upstream_error` | 上游网络超时或连接中断 | 检查网络连通性；推荐首选稳定免签名的 `endpoint: samantha` |
 | 二维码图片 404 | 登录流超时（有效期 5 分钟）或服务重启 | 刷新面板重新发起登录请求即可 |
@@ -287,4 +287,4 @@ make package
 ## 许可证与免责声明
 
 - 本项目基于 [MIT 许可证](LICENSE) 开源。
-- **免责声明**：本项目为开源客户端适配工具，旨在提供通用的多协议本地网关支持，与北京字节跳动科技有限公司无任何隶属、认可或背书关系。“豆包”与“Doubao”为相关权利人的注册商标。使用者应自行对账号使用行为及服务条款合规性负责，开发者不对因使用本工具可能引发的账户变动或服务限制承担责任。
+- **免责声明**：本项目为开源客户端适配工具，代号“豆姐（Doujie）”，旨在划清商标界限并提供通用的多协议本地网关支持。本项目与北京字节跳动科技有限公司无任何隶属、认可或背书关系。“豆包”与“Doubao”为相关权利人的注册商标。使用者应自行对账号使用行为及服务条款合规性负责，开发者不对因使用本工具可能引发的账户变动或服务限制承担责任。
