@@ -14,14 +14,14 @@ type modelSpec struct {
 }
 
 var doubaoModels = []modelSpec{
-	{ID: "doubao", Display: "豆包 Auto", Context: 256000, Output: 32000},
-	{ID: "doubao-seed-2.0", Display: "豆包 Seed 2.0", Context: 256000, Output: 32000},
-	{ID: "doubao-seed-2.0-lite", Display: "豆包 Seed 2.0 Lite", Context: 256000, Output: 32000},
-	{ID: "doubao-seed-2.0-code", Display: "豆包 Seed 2.0 Code", Context: 256000, Output: 32000},
-	{ID: "doubao-seed-1.6", Display: "豆包 Seed 1.6", Context: 256000, Output: 32000},
-	{ID: "doubao-seed-1.6-thinking", Display: "豆包 Seed 1.6 思考", Context: 256000, Output: 32000},
-	{ID: "doubao-seed-1.6-flash", Display: "豆包 Seed 1.6 Flash", Context: 256000, Output: 32000},
-	{ID: "doubao-pro", Display: "豆包 Pro", Context: 131072, Output: 16384},
+	{ID: "doubao", Display: "豆姐 Auto", Context: 256000, Output: 32000},
+	{ID: "doubao-seed-2.0", Display: "豆姐 Seed 2.0", Context: 256000, Output: 32000},
+	{ID: "doubao-seed-2.0-lite", Display: "豆姐 Seed 2.0 Lite", Context: 256000, Output: 32000},
+	{ID: "doubao-seed-2.0-code", Display: "豆姐 Seed 2.0 Code", Context: 256000, Output: 32000},
+	{ID: "doubao-seed-1.6", Display: "豆姐 Seed 1.6", Context: 256000, Output: 32000},
+	{ID: "doubao-seed-1.6-thinking", Display: "豆姐 Seed 1.6 思考", Context: 256000, Output: 32000},
+	{ID: "doubao-seed-1.6-flash", Display: "豆姐 Seed 1.6 Flash", Context: 256000, Output: 32000},
+	{ID: "doubao-pro", Display: "豆姐 Pro", Context: 131072, Output: 16384},
 }
 
 func staticModels() []pluginapi.ModelInfo {

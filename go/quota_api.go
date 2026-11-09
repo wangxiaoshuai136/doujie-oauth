@@ -110,6 +110,7 @@ type cardUseResponse struct {
 }
 
 func commerceParams(c credential) strings.Builder {
+	profile := c.profile()
 	params := make([]string, 0, 24)
 	add := func(key, value string) {
 		if value != "" {
@@ -117,19 +118,19 @@ func commerceParams(c credential) strings.Builder {
 		}
 	}
 	add("version_code", "20800")
-	add("language", "zh")
+	add("language", profile.Language)
 	add("device_platform", "web")
 	add("doubao_device_platform", "web")
-	add("aid", "497858")
-	add("real_aid", "497858")
+	add("aid", profile.PassportAID)
+	add("real_aid", profile.PassportAID)
 	add("pkg_type", "release_version")
 	add("device_id", c.DeviceID)
-	add("pc_version", "3.44.8")
-	add("doubao_pc_version", "3.44.8")
+	add("pc_version", profile.WebVersion)
+	add("doubao_pc_version", profile.WebVersion)
 	add("web_id", c.WebID)
 	add("tea_uuid", c.WebID)
-	add("region", "CN")
-	add("sys_region", "CN")
+	add("region", profile.Region)
+	add("sys_region", profile.SysRegion)
 	add("samantha_web", "1")
 	add("web_platform", "browser")
 	add("use-olympus-account", "1")
@@ -160,7 +161,7 @@ func quotaAPIRequest(sender httpSender, c credential, path string, body any) ([]
 		return nil, errors.New("cannot encode quota request")
 	}
 	params := commerceParams(c)
-	target := doubaoRoot + path
+	target := c.profile().Root + path
 	if params.Len() > 0 {
 		target += "?" + params.String()
 	}
@@ -168,9 +169,9 @@ func quotaAPIRequest(sender httpSender, c credential, path string, body any) ([]
 		"Accept":          {"application/json"},
 		"Content-Type":    {"application/json"},
 		"User-Agent":      {chromeUA},
-		"Referer":         {doubaoRoot + "/chat/"},
-		"Origin":          {doubaoRoot},
-		"Accept-Language": {"zh-CN,zh;q=0.9"},
+		"Referer":         {c.profile().Root + "/chat/"},
+		"Origin":          {c.profile().Root},
+		"Accept-Language": {c.profile().Language + ",en;q=0.8"},
 		"Cookie":          {c.cookieHeader()},
 	}
 	resp, err := sender.Do(pluginapi.HTTPRequest{Method: http.MethodPost, URL: target, Headers: headers, Body: raw})
@@ -178,7 +179,7 @@ func quotaAPIRequest(sender httpSender, c credential, path string, body any) ([]
 		return nil, errors.New("quota service unreachable")
 	}
 	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
-		return nil, errors.New("Doubao session expired")
+		return nil, errors.New("session expired")
 	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("quota service returned HTTP %d", resp.StatusCode)
@@ -350,13 +351,13 @@ func mergeQuotaAPI(req pluginapi.QuotaFetchRequest, sender httpSender, local plu
 			buckets = bucketsFromSection(summary.Data.IncentiveQuotaSection)
 		}
 		if len(buckets) > 0 {
-			local.Groups = []pluginapi.QuotaGroup{{DisplayName: "豆包订阅额度", Buckets: buckets}}
+			local.Groups = []pluginapi.QuotaGroup{{DisplayName: "豆姐订阅额度", Buckets: buckets}}
 			local.Summary = nil
 		}
 		if summary.Data.MemberInfo.HasActiveSubscription || summary.Data.CurrentSubscription.Status != 0 {
 			plan := firstNonEmpty(summary.Data.CurrentSubscription.Display.ProductName, summary.Data.CurrentSubscription.SkuKey)
 			if plan == "" {
-				plan = "豆包订阅"
+				plan = "豆姐订阅"
 			}
 			tier := ""
 			if local.Subscription != nil {

@@ -28,6 +28,7 @@ const (
 )
 
 type loginFlow struct {
+	Site     string
 	Token    string
 	CSRF     string
 	Cookies  map[string]string
@@ -88,12 +89,21 @@ func peekFlow(id string) *loginFlow {
 }
 
 func browserHeaders(extra http.Header) http.Header {
+	return browserHeadersForSite(siteCN, extra)
+}
+
+func browserHeadersForSite(site string, extra http.Header) http.Header {
+	profile := profileForSite(site)
+	language := "zh-CN,zh;q=0.9"
+	if profile.Language != "zh" {
+		language = profile.Language + ",en;q=0.8"
+	}
 	h := http.Header{
 		"User-Agent":      {chromeUA},
 		"Accept":          {"application/json, text/plain, */*"},
-		"Referer":         {doubaoRoot + "/chat/login"},
-		"Origin":          {doubaoRoot},
-		"Accept-Language": {"zh-CN,zh;q=0.9"},
+		"Referer":         {profile.Root + "/chat/login"},
+		"Origin":          {profile.Root},
+		"Accept-Language": {language},
 	}
 	for k, v := range extra {
 		h[k] = append([]string(nil), v...)
@@ -112,6 +122,12 @@ func mergeCookies(jar map[string]string, headers http.Header) {
 }
 
 func httpGet(sender httpSender, target string, headers http.Header, jar map[string]string) (pluginapi.HTTPResponse, error) {
+	if headers == nil {
+		headers = http.Header{}
+	}
+	if len(jar) > 0 && headers.Get("Cookie") == "" {
+		headers.Set("Cookie", cookieHeader(jar))
+	}
 	resp, err := sender.Do(pluginapi.HTTPRequest{Method: http.MethodGet, URL: target, Headers: headers})
 	if err != nil {
 		return resp, err
@@ -133,15 +149,20 @@ func startLogin(req pluginapi.AuthLoginStartRequest, sender httpSender) (plugina
 	if req.Provider == desktopEntryID {
 		return startDesktopImport(req, sender, key)
 	}
+	site := siteCN
+	if req.Provider == internationalEntryID {
+		site = siteGlobal
+	}
+	profile := profileForSite(site)
 	jar := map[string]string{}
-	resp, err := httpGet(sender, doubaoRoot+"/", browserHeaders(nil), jar)
+	resp, err := httpGet(sender, profile.Root+"/", browserHeadersForSite(site, nil), jar)
 	if err != nil {
 		return out, errors.New("cannot reach Doubao login")
 	}
 	if resp.StatusCode >= 400 {
 		return out, fmt.Errorf("Doubao login page returned HTTP %d", resp.StatusCode)
 	}
-	csrfResp, err := httpGet(sender, doubaoRoot+"/passport/safe/csrf_token/?aid="+passportAID, browserHeaders(nil), jar)
+	csrfResp, err := httpGet(sender, profile.Root+"/passport/safe/csrf_token/?aid="+profile.PassportAID, browserHeadersForSite(site, nil), jar)
 	if err != nil {
 		return out, errors.New("cannot request Doubao CSRF token")
 	}
@@ -160,9 +181,9 @@ func startLogin(req pluginapi.AuthLoginStartRequest, sender httpSender) (plugina
 	if csrf == "" {
 		return out, errors.New("Doubao did not return a CSRF token")
 	}
-	next := url.QueryEscape(doubaoRoot)
-	qrURL := doubaoRoot + "/passport/web/get_qrcode/?next=" + next + "&aid=" + passportAID
-	qrResp, err := httpGet(sender, qrURL, browserHeaders(http.Header{"X-Tt-Passport-Csrf-Token": {csrf}}), jar)
+	next := url.QueryEscape(profile.Root)
+	qrURL := profile.Root + "/passport/web/get_qrcode/?next=" + next + "&aid=" + profile.PassportAID
+	qrResp, err := httpGet(sender, qrURL, browserHeadersForSite(site, http.Header{"X-Tt-Passport-Csrf-Token": {csrf}}), jar)
 	if err != nil {
 		return out, errors.New("cannot request Doubao login QR code")
 	}
@@ -185,7 +206,7 @@ func startLogin(req pluginapi.AuthLoginStartRequest, sender httpSender) (plugina
 		return out, errors.New("cannot generate login state")
 	}
 	expires := time.Now().Add(flowsTTL)
-	putFlow(flowID, &loginFlow{Token: qrEnvelope.Data.Token, CSRF: csrf, Cookies: jar, Expires: expires, QRPNG: png})
+	putFlow(flowID, &loginFlow{Site: site, Token: qrEnvelope.Data.Token, CSRF: csrf, Cookies: jar, Expires: expires, QRPNG: png})
 	state, err := sealState(key, flowID, expires)
 	if err != nil {
 		return out, err
@@ -198,10 +219,11 @@ func startLogin(req pluginapi.AuthLoginStartRequest, sender httpSender) (plugina
 		State:     state,
 		ExpiresAt: expires.UTC(),
 		Metadata: map[string]any{
+			"site":        site,
 			"qr_path":     qrPath,
 			"qr_base64":   base64.StdEncoding.EncodeToString(png),
 			"qr_mime":     "image/png",
-			"poll_hint":   "scan with the Doubao mobile app",
+			"poll_hint":   "scan with the mobile app",
 			"expires_sec": int(flowsTTL / time.Second),
 		},
 	}
@@ -265,9 +287,10 @@ func pollLogin(req pluginapi.AuthLoginPollRequest, sender httpSender) (pluginapi
 		takeFlow(flowID)
 		return pluginapi.AuthLoginPollResponse{Status: pluginapi.AuthLoginStatusSuccess, Auth: *flow.Imported}, nil
 	}
-	next := url.QueryEscape(doubaoRoot)
-	target := doubaoRoot + "/passport/web/check_qrconnect/?next=" + next + "&token=" + url.QueryEscape(flow.Token) + "&aid=" + passportAID
-	resp, err := httpGet(sender, target, browserHeaders(http.Header{"X-Tt-Passport-Csrf-Token": {flow.CSRF}}), flow.Cookies)
+	profile := profileForSite(flow.Site)
+	next := url.QueryEscape(profile.Root)
+	target := profile.Root + "/passport/web/check_qrconnect/?next=" + next + "&token=" + url.QueryEscape(flow.Token) + "&aid=" + profile.PassportAID
+	resp, err := httpGet(sender, target, browserHeadersForSite(flow.Site, http.Header{"X-Tt-Passport-Csrf-Token": {flow.CSRF}}), flow.Cookies)
 	if err != nil {
 		return pending, nil
 	}
@@ -312,7 +335,7 @@ func pollLogin(req pluginapi.AuthLoginPollRequest, sender httpSender) (pluginapi
 		if strings.TrimSpace(flow.Cookies["sessionid"]) == "" {
 			return pluginapi.AuthLoginPollResponse{Status: pluginapi.AuthLoginStatusError, Message: "登录已确认，但未取到会话凭据"}, nil
 		}
-		auth, err := authFromCookies(flow.Cookies)
+		auth, err := authFromCookies(flow.Cookies, flow.Site)
 		if err != nil {
 			return pluginapi.AuthLoginPollResponse{Status: pluginapi.AuthLoginStatusError, Message: err.Error()}, nil
 		}
@@ -324,7 +347,7 @@ func pollLogin(req pluginapi.AuthLoginPollRequest, sender httpSender) (pluginapi
 	}
 }
 
-func authFromCookies(jar map[string]string) (pluginapi.AuthData, error) {
+func authFromCookies(jar map[string]string, site string) (pluginapi.AuthData, error) {
 	deviceID, webID, fp := newDeviceIdentity()
 	cookies := map[string]string{}
 	for k, v := range jar {
@@ -332,26 +355,35 @@ func authFromCookies(jar map[string]string) (pluginapi.AuthData, error) {
 			cookies[k] = v
 		}
 	}
-	c := credential{Type: credentialProvider, Cookies: cookies, DeviceID: deviceID, WebID: webID, FP: fp, LoginAt: time.Now().Unix()}
+	site = normalizeSite(site)
+	c := credential{Type: credentialProvider, Site: site, Cookies: cookies, DeviceID: deviceID, WebID: webID, FP: fp, LoginAt: time.Now().Unix()}
 	raw, err := json.Marshal(c)
 	if err != nil {
 		return pluginapi.AuthData{}, errors.New("cannot encode credential")
 	}
 	sum := sha256.Sum256([]byte(cookies["sessionid"]))
-	id := "doubao-" + hex.EncodeToString(sum[:12]) + ".json"
-	label := "豆包账号 " + strings.ToUpper(hex.EncodeToString(sum[:3]))
+	prefix := "doubao-"
+	providerEntry := entryID
+	labelPrefix := "豆姐账号 "
+	if site == siteGlobal {
+		prefix = "dola-"
+		providerEntry = internationalEntryID
+		labelPrefix = "豆姐国际版账号 "
+	}
+	id := prefix + hex.EncodeToString(sum[:12]) + ".json"
+	label := labelPrefix + strings.ToUpper(hex.EncodeToString(sum[:3]))
 	return pluginapi.AuthData{
 		Provider:    credentialProvider,
 		ID:          id,
 		FileName:    id,
 		Label:       label,
 		StorageJSON: raw,
-		Metadata:    map[string]any{"email": label, "type": credentialProvider, "oauth_provider": entryID},
+		Metadata:    map[string]any{"email": label, "type": credentialProvider, "oauth_provider": providerEntry, "site": site},
 	}, nil
 }
 
 func parseAuth(req pluginapi.AuthParseRequest) pluginapi.AuthParseResponse {
-	if req.Provider != entryID && req.Provider != desktopEntryID && req.Provider != credentialProvider {
+	if req.Provider != entryID && req.Provider != internationalEntryID && req.Provider != desktopEntryID && req.Provider != credentialProvider {
 		return pluginapi.AuthParseResponse{}
 	}
 	var persisted struct {
@@ -372,7 +404,11 @@ func parseAuth(req pluginapi.AuthParseRequest) pluginapi.AuthParseResponse {
 	metadata := persistedMetadata(req.RawJSON, c)
 	metadata["email"] = persisted.Email
 	metadata["type"] = credentialProvider
+	metadata["site"] = c.site()
 	metadata["oauth_provider"] = entryID
+	if c.site() == siteGlobal {
+		metadata["oauth_provider"] = internationalEntryID
+	}
 	return pluginapi.AuthParseResponse{Handled: true, Auth: pluginapi.AuthData{
 		Provider:    credentialProvider,
 		ID:          name,
@@ -463,7 +499,7 @@ func startDesktopImport(req pluginapi.AuthLoginStartRequest, sender httpSender, 
 		return out, errors.New("cannot generate login state")
 	}
 	expires := time.Now().Add(flowsTTL)
-	putFlow(flowID, &loginFlow{Expires: expires, Imported: &authData})
+	putFlow(flowID, &loginFlow{Site: siteCN, Expires: expires, Imported: &authData})
 	state, err := sealState(key, flowID, expires)
 	if err != nil {
 		return out, err

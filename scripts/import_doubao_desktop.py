@@ -106,7 +106,7 @@ def main() -> None:
         default=str(Path(os.environ.get("LOCALAPPDATA", "")) / "Doubao" / "User Data"),
         help="Doubao desktop 'User Data' directory",
     )
-    parser.add_argument("--label", default="豆包账号（桌面端导入）")
+    parser.add_argument("--label", default="豆姐账号（桌面端导入）")
     args = parser.parse_args()
 
     cookies = load_cookies(Path(args.user_data))

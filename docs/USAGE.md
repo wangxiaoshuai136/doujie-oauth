@@ -39,7 +39,9 @@ python scripts/import_doubao_desktop.py --auth-dir "path/to/cpa/oauth"
 
 ### Option B: Mobile QR Sign-In
 
-1. Open the panel's plugin / OAuth page and select `豆姐`.
+The plugin does not auto-detect regions. Choose either **豆姐（国内版）** or **豆姐国际版（Dola）** explicitly in the panel. The international entry uses `dola.com` and is subject to the upstream regional policy; it is optional and does not change the default domestic account.
+
+1. Open the panel's plugin / OAuth page and select the desired entry.
 2. The panel renders a QR image served by the plugin at
    `/v0/resource/plugins/omc-doubao-oauth/qr.png` (or base64 metadata).
 3. Scan it with the mobile app and confirm authorization.

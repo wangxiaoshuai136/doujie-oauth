@@ -19,6 +19,7 @@ func importDesktopAuth(sender httpSender, cookies map[string]string) (pluginapi.
 	deviceID, webID, fp := newDeviceIdentity()
 	c := credential{
 		Type:     credentialProvider,
+		Site:     siteCN,
 		Cookies:  cookies,
 		DeviceID: deviceID,
 		WebID:    webID,
@@ -42,6 +43,7 @@ func importDesktopAuth(sender httpSender, cookies map[string]string) (pluginapi.
 		Metadata: map[string]any{
 			"email":          label,
 			"type":           credentialProvider,
+			"site":           siteCN,
 			"oauth_provider": desktopEntryID,
 			"source":         "desktop-import",
 		},
@@ -49,7 +51,7 @@ func importDesktopAuth(sender httpSender, cookies map[string]string) (pluginapi.
 }
 
 func desktopAccountLabel(sender httpSender, c credential) string {
-	fallback := "豆包账号（桌面端导入）"
+	fallback := "豆姐账号（桌面端导入）"
 	if sender == nil {
 		return fallback
 	}
@@ -76,5 +78,5 @@ func desktopAccountLabel(sender httpSender, c credential) string {
 	if name == "" {
 		return fallback
 	}
-	return "豆包账号 " + name
+	return "豆姐账号 " + name
 }

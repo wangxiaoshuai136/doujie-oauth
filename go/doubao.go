@@ -67,6 +67,7 @@ func buildRequest(req pluginapi.ExecutorRequest, sender httpSender) (preparedReq
 		return out, pluginabi.NewError("invalid_request", err.Error(), 400)
 	}
 	cfg := getConfig()
+	profile := c.profile()
 	deep := cfg.DeepThink || wantsDeepThink(model) || requestDeep
 	params := securityParams(c, model)
 	endpoint := cfg.Endpoint
@@ -77,12 +78,12 @@ func buildRequest(req pluginapi.ExecutorRequest, sender httpSender) (preparedReq
 	var sent map[string]any
 	if endpoint == "chat" {
 		path = "/chat/completion?"
-		sent = chatCompletionPayload(prompt, deep, c.FP)
+		sent = chatCompletionPayload(prompt, deep, c.FP, c.botID())
 	} else {
 		path = "/samantha/chat/completion?"
-		sent = samanthaPayload(prompt, deep)
+		sent = samanthaPayload(prompt, deep, c.botID())
 	}
-	target := doubaoRoot + path + params.Encode()
+	target := profile.Root + path + params.Encode()
 	raw, err := json.Marshal(sent)
 	if err != nil {
 		return out, pluginabi.NewError("serialization_error", "cannot encode Doubao request", 500)
@@ -92,9 +93,9 @@ func buildRequest(req pluginapi.ExecutorRequest, sender httpSender) (preparedReq
 		"Content-Type":    {"application/json"},
 		"Agw-Js-Conv":     {"str"},
 		"User-Agent":      {chromeUA},
-		"Referer":         {doubaoRoot + "/chat/"},
-		"Origin":          {doubaoRoot},
-		"Accept-Language": {"zh-CN,zh;q=0.9"},
+		"Referer":         {profile.Root + "/chat/"},
+		"Origin":          {profile.Root},
+		"Accept-Language": {profile.Language + ",en;q=0.8"},
 		"Cookie":          {c.cookieHeader()},
 	}
 	if endpoint == "chat" {
@@ -117,23 +118,30 @@ func buildRequest(req pluginapi.ExecutorRequest, sender httpSender) (preparedReq
 }
 
 func securityParams(c credential, model string) url.Values {
+	profile := c.profile()
 	params := url.Values{}
-	params.Set("aid", "582478")
-	params.Set("real_aid", "582478")
+	params.Set("aid", profile.ChatAID)
+	params.Set("real_aid", profile.ChatAID)
 	params.Set("device_id", c.DeviceID)
 	params.Set("tea_uuid", c.DeviceID)
 	params.Set("web_id", c.WebID)
 	params.Set("device_platform", "web")
-	params.Set("language", "zh")
-	params.Set("region", "CN")
-	params.Set("sys_region", "CN")
+	params.Set("language", profile.Language)
+	params.Set("region", profile.Region)
+	params.Set("sys_region", profile.SysRegion)
 	params.Set("pkg_type", "release_version")
 	params.Set("version_code", "20800")
-	params.Set("pc_version", getConfig().AppVersion)
-	params.Set("chromium_version", chromiumVer)
-	params.Set("client_platform", "pc_client")
-	params.Set("runtime", "web")
-	params.Set("runtime_version", "3.5.4")
+	pcVersion := profile.WebVersion
+	if profile.ID == siteCN {
+		pcVersion = getConfig().AppVersion
+	}
+	params.Set("pc_version", pcVersion)
+	if profile.ID == siteCN {
+		params.Set("chromium_version", chromiumVer)
+		params.Set("client_platform", "pc_client")
+		params.Set("runtime", "web")
+		params.Set("runtime_version", "3.5.4")
+	}
 	params.Set("samantha_web", "1")
 	params.Set("use-olympus-account", "1")
 	params.Set("fp", c.FP)
@@ -370,7 +378,7 @@ func asInt(v any) int {
 	}
 }
 
-func samanthaPayload(prompt string, deep bool) map[string]any {
+func samanthaPayload(prompt string, deep bool, botID string) map[string]any {
 	return map[string]any{
 		"messages": []any{map[string]any{
 			"content":      string(mustJSON(map[string]any{"text": prompt})),
@@ -396,11 +404,11 @@ func samanthaPayload(prompt string, deep bool) map[string]any {
 		"evaluate_option":       map[string]any{"web_ab_params": ""},
 		"local_conversation_id": randomUUID(),
 		"local_message_id":      randomUUID(),
-		"bot_id":                getConfig().BotID,
+		"bot_id":                botID,
 	}
 }
 
-func chatCompletionPayload(prompt string, deep bool, fp string) map[string]any {
+func chatCompletionPayload(prompt string, deep bool, fp string, botID string) map[string]any {
 	textBlock := map[string]any{
 		"block_type": 10000,
 		"content": map[string]any{
@@ -418,7 +426,7 @@ func chatCompletionPayload(prompt string, deep bool, fp string) map[string]any {
 		"client_meta": map[string]any{
 			"local_conversation_id": "local_" + strings.ReplaceAll(randomUUID(), "-", "")[:16],
 			"conversation_id":       "",
-			"bot_id":                getConfig().BotID,
+			"bot_id":                botID,
 			"last_section_id":       "",
 			"last_message_index":    0,
 		},

@@ -131,13 +131,13 @@ func authLabel(storage []byte) string {
 	if json.Unmarshal(storage, &persisted) == nil && strings.TrimSpace(persisted.Email) != "" {
 		return persisted.Email
 	}
-	return "豆包账号"
+	return "豆姐账号"
 }
 
 func quotaDescription() pluginapi.QuotaDescribeResponse {
 	return pluginapi.QuotaDescribeResponse{
 		SupportedProviders: []string{credentialProvider},
-		DisplayName:        "Doubao",
+		DisplayName:        "OMC Doujie",
 		SupportsReset:      true,
 	}
 }
@@ -163,7 +163,7 @@ func localQuotaFetch(req pluginapi.QuotaFetchRequest) (pluginapi.QuotaFetchRespo
 		},
 		Summary: summary,
 		Groups: []pluginapi.QuotaGroup{{
-			DisplayName: "豆包订阅额度（本地估算）",
+			DisplayName: "豆姐订阅额度（本地估算）",
 			Buckets: []pluginapi.QuotaBucket{
 				{
 					Window:            windowFiveHour,

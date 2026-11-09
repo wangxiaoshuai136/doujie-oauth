@@ -68,9 +68,8 @@ func handleManagementResource(req pluginapi.ManagementRequest) (pluginapi.Manage
 
 const desktopImportedPage = `<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8">
-<title>豆包桌面端账号已导入</title>
+<title>豆姐桌面端账号已导入</title>
 <style>body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#0f172a;color:#e2e8f0;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}main{max-width:520px;padding:40px;border-radius:16px;background:#1e293b;box-shadow:0 20px 60px rgba(0,0,0,.4)}h1{font-size:22px;margin:0 0 12px}p{line-height:1.7;color:#94a3b8}code{color:#38bdf8}</style></head>
-<body><main><h1>已从豆包桌面端导入账号</h1>
-<p>插件已读取本机豆包桌面客户端的登录态并写入 CPA。可以关闭此页，回到面板查看额度卡。</p>
+<body><main><h1>已从本地桌面端导入账号</h1>
+<p>插件已读取本机桌面客户端的登录态并写入 CPA。可以关闭此页，回到面板查看额度卡。</p>
 <p>如果没有看到账号，请确认桌面客户端已登录后重新点击该入口。</p></main></body></html>`
-

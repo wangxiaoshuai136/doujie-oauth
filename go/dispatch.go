@@ -55,19 +55,19 @@ func registration() any {
 	return map[string]any{
 		"schema_version": pluginabi.SchemaVersion,
 		"metadata": pluginapi.Metadata{
-			Name:             "OMC Doubao OAuth",
+			Name:             "OMC Doujie OAuth",
 			Version:          pluginVersion,
 			Author:           "wangxiaoshuai136",
 			GitHubRepository: "https://github.com/wangxiaoshuai136/omc-doubao-oauth",
 			Logo:             resourceAssetURL("logo.png"),
 			ConfigFields: []pluginapi.ConfigField{
 				{Name: "max_concurrency", Type: pluginapi.ConfigFieldTypeInteger, Description: "Maximum simultaneous requests per credential (default 3)."},
-				{Name: "bot_id", Type: pluginapi.ConfigFieldTypeString, Description: "Doubao bot id used for every chat request (default 7234781073513644036)."},
+				{Name: "bot_id", Type: pluginapi.ConfigFieldTypeString, Description: "Bot id used for every chat request. Leave the default to use the per-site bot automatically."},
 				{Name: "deep_think", Type: pluginapi.ConfigFieldTypeBoolean, Description: "Request Doubao deep thinking for every call (default false; thinking models enable it automatically)."},
 				{Name: "signer", Type: pluginapi.ConfigFieldTypeEnum, EnumValues: []string{"none", "external"}, Description: "Request signing mode: direct HTTP (none) or an external signing service (external)."},
 				{Name: "signer_url", Type: pluginapi.ConfigFieldTypeString, Description: "Absolute HTTP(S) URL of the external signer; required when signer is external."},
 				{Name: "public_base_url", Type: pluginapi.ConfigFieldTypeString, Description: "Optional absolute CPA base URL used to render the login QR image when the panel does not supply one."},
-				{Name: "endpoint", Type: pluginapi.ConfigFieldTypeEnum, EnumValues: []string{"samantha", "chat"}, Description: "Upstream Doubao endpoint family: samantha (default, direct HTTP) or chat (desktop /chat/completion, usually needs an external signer)."},
+				{Name: "endpoint", Type: pluginapi.ConfigFieldTypeEnum, EnumValues: []string{"samantha", "chat"}, Description: "Upstream endpoint family: samantha (default, direct HTTP) or chat (desktop completion, usually needs an external signer)."},
 				{Name: "app_version", Type: pluginapi.ConfigFieldTypeString, Description: "Doubao desktop client version sent in request parameters (default 2.1.7)."},
 			},
 		},
@@ -102,11 +102,12 @@ func handleMethod(method string, raw []byte) (any, error) {
 	case "auth.identifier":
 		return map[string]any{
 			"identifier":           entryID,
-			"identifiers":          []string{entryID, desktopEntryID},
+			"identifiers":          []string{entryID, internationalEntryID, desktopEntryID},
 			"credential_providers": []string{credentialProvider},
 			"entries": []map[string]any{
-				{"identifier": entryID, "name": "豆包", "logo": resourceAssetURL("doubao.png")},
-				{"identifier": desktopEntryID, "name": "豆包（桌面端导入）", "logo": resourceAssetURL("doubao.png")},
+				{"identifier": entryID, "name": "豆姐（国内版）", "logo": resourceAssetURL("doubao.png")},
+				{"identifier": internationalEntryID, "name": "豆姐国际版（Dola）", "logo": resourceAssetURL("doubao.png")},
+				{"identifier": desktopEntryID, "name": "豆姐（桌面端导入）", "logo": resourceAssetURL("doubao.png")},
 			},
 		}, nil
 	case "executor.identifier", "model.identifier":
@@ -138,13 +139,13 @@ func handleMethod(method string, raw []byte) (any, error) {
 		}
 		return value, nil
 	case "auth.refresh":
-		return nil, pluginabi.NewError("reauth_required", "Doubao sessions cannot be refreshed; sign in again", 400)
+		return nil, pluginabi.NewError("reauth_required", "Sessions cannot be refreshed; sign in again", 400)
 	case "management.register":
 		return map[string]any{"resources": []map[string]any{
 			{"path": "/logo.png", "menu": "", "description": "Plugin logo."},
-			{"path": "/qr.png", "menu": "", "description": "Doubao login QR code for the latest sign-in flow."},
+			{"path": "/qr.png", "menu": "", "description": "Login QR code for the latest sign-in flow."},
 			{"path": "/imported.html", "menu": "", "description": "Desktop import result page."},
-			{"path": "/doubao.png", "menu": "", "description": "Doubao sign-in logo."},
+			{"path": "/doubao.png", "menu": "", "description": "Provider sign-in logo."},
 			{"path": "/omc.json", "menu": "", "description": "Public, optional OMC plugin declaration."},
 		}}, nil
 	case "management.handle":
@@ -164,7 +165,7 @@ func handleMethod(method string, raw []byte) (any, error) {
 			Type string `json:"type"`
 		}
 		if json.Unmarshal(req.StorageJSON, &persisted) != nil || persisted.Type != credentialProvider {
-			return nil, pluginabi.NewError("invalid_auth", "invalid Doubao credential", 401)
+			return nil, pluginabi.NewError("invalid_auth", "invalid credential", 401)
 		}
 		return pluginapi.ModelResponse{Provider: credentialProvider, Models: staticModels()}, nil
 	case "executor.execute":
@@ -207,4 +208,3 @@ func handleMethod(method string, raw []byte) (any, error) {
 		return nil, pluginabi.NewError("unknown_method", "unknown plugin method", http.StatusNotImplemented)
 	}
 }
-

@@ -73,7 +73,7 @@ func TestQuotaFetchShape(t *testing.T) {
 
 func TestQuotaDescription(t *testing.T) {
 	desc := quotaDescription()
-	if desc.DisplayName != "Doubao" || !desc.SupportsReset {
+	if desc.DisplayName != "OMC Doujie" || !desc.SupportsReset {
 		t.Fatalf("unexpected description: %+v", desc)
 	}
 	if len(desc.SupportedProviders) != 1 || desc.SupportedProviders[0] != credentialProvider {

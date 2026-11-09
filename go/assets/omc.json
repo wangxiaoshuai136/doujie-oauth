@@ -4,8 +4,8 @@
   "plugin_version": "0.1.0",
   "i18n": {
     "description": {
-      "zh": "非官方豆姐（Doujie）提供商插件：支持扫码与本地桌面会话导入，向 CLIProxyAPI 暴露对话大模型。与相关商业商标无关。",
-      "en": "Unofficial Doujie provider: supports QR and desktop session import, exposing chat models to CLIProxyAPI. Not affiliated with any commercial trademarks.",
+      "zh": "非官方豆姐（Doujie）提供商插件：支持国内版、国际版（Dola）显式扫码入口与本地桌面会话导入。地区不会自动切换。与相关商业商标无关。",
+      "en": "Unofficial Doujie provider: explicit domestic and international (Dola) QR entries plus desktop session import. Regions never switch automatically. Not affiliated with any commercial trademarks.",
       "zh-Hant": "非官方豆姐（Doujie）提供者外掛：支援掃碼與本機桌面對話導入，向 CLIProxyAPI 暴露對話大模型。與相關商業商標無關。"
     }
   }

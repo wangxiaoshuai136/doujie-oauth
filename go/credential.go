@@ -11,13 +11,15 @@ import (
 )
 
 const (
-	credentialProvider = "doubao"
-	entryID            = "doubao"
-	defaultBotID       = "7234781073513644036"
+	credentialProvider   = "doubao"
+	entryID              = "doubao"
+	internationalEntryID = "dola"
+	defaultBotID         = "7234781073513644036"
 )
 
 type credential struct {
 	Type     string            `json:"type"`
+	Site     string            `json:"site,omitempty"`
 	Email    string            `json:"email"`
 	Cookies  map[string]string `json:"cookies"`
 	DeviceID string            `json:"device_id"`
@@ -28,17 +30,21 @@ type credential struct {
 }
 
 func (c credential) cookieHeader() string {
-	if len(c.Cookies) == 0 {
+	return cookieHeader(c.Cookies)
+}
+
+func cookieHeader(cookies map[string]string) string {
+	if len(cookies) == 0 {
 		return ""
 	}
-	names := make([]string, 0, len(c.Cookies))
-	for name := range c.Cookies {
+	names := make([]string, 0, len(cookies))
+	for name := range cookies {
 		names = append(names, name)
 	}
 	sort.Strings(names)
 	parts := make([]string, 0, len(names))
 	for _, name := range names {
-		if value := strings.TrimSpace(c.Cookies[name]); value != "" {
+		if value := strings.TrimSpace(cookies[name]); value != "" {
 			parts = append(parts, name+"="+value)
 		}
 	}

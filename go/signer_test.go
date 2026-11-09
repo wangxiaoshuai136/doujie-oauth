@@ -75,3 +75,25 @@ func TestBuildRequest(t *testing.T) {
 		t.Fatalf("unexpected body: %s", plan.HTTP.Body)
 	}
 }
+
+func TestBuildRequestGlobalUsesDolaRouting(t *testing.T) {
+	if err := configure(nil); err != nil {
+		t.Fatal(err)
+	}
+	c := credential{Type: credentialProvider, Site: siteGlobal, Cookies: map[string]string{"sessionid": "s"}, DeviceID: "7000000000000000", WebID: "7600000000000000000", FP: "verify_x"}
+	storage, _ := json.Marshal(c)
+	payload := []byte(`{"model":"doubao","messages":[{"role":"user","content":"hello"}]}`)
+	plan, err := buildRequest(pluginapi.ExecutorRequest{Payload: payload, Model: "doubao", StorageJSON: storage}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(plan.HTTP.URL, "https://www.dola.com/samantha/chat/completion?") || !strings.Contains(plan.HTTP.URL, "aid=495671") {
+		t.Fatalf("unexpected global URL: %s", plan.HTTP.URL)
+	}
+	if strings.Contains(plan.HTTP.URL, "region=CN") {
+		t.Fatalf("global request must not force CN region: %s", plan.HTTP.URL)
+	}
+	if !strings.Contains(string(plan.HTTP.Body), "7339470689562525703") {
+		t.Fatalf("global bot id missing: %s", plan.HTTP.Body)
+	}
+}
