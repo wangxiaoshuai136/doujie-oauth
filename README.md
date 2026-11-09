@@ -5,7 +5,7 @@
 <h1 align="center">OMC Doujie OAuth</h1>
 
 <p align="center">
-  High-performance unofficial Doujie (豆姐) provider plugin for
+  High-performance unofficial "Doujie" (豆姐) protocol gateway adapter plugin for
   <a href="https://github.com/router-for-me/CLIProxyAPI">CLIProxyAPI (CPA)</a>
 </p>
 
@@ -20,12 +20,20 @@
   <a href="README.zh-CN.md">简体中文</a> · English
 </p>
 
-OMC Doujie OAuth brings "Doujie" (豆姐) model compatibility to CLIProxyAPI. Sign in through the mobile app QR code or effortlessly import an existing Windows desktop client session without scanning.
+> ### ⚠️ Disclaimer & Terms of Use (Must Read)
+>
+> 1. **Educational & Research Purposes Only**: This project is an independent open-source technical experiment created strictly for academic research, network protocol study, multi-format API gateway conversion experiments, and personal learning. **Commercial use, production deployment, or unlawful activity is strictly prohibited.**
+> 2. **Independent Third-Party Implementation**: Codenamed "**Doujie**" (豆姐), this software is an entirely independent protocol adapter. **It is not affiliated with, endorsed by, sponsored by, or associated with any commercial enterprise.** Any technical identifiers referenced are solely for illustrating message wire-formats; all relevant trademarks and copyrights belong exclusively to their respective owners.
+> 3. **Provided AS-IS & Zero Liability**: This software and prebuilt binaries are provided "**AS IS**" without warranty of any kind, express or implied. **The authors and contributors assume NO liability or responsibility whatsoever for any direct or indirect consequences, losses, account restrictions, service suspensions, data corruption, or legal disputes resulting from the download, use, testing, or dissemination of this software. All risks are assumed entirely by the user.**
+> 4. **Agreement by Use**: By viewing, downloading, cloning, or running this repository in any manner, you acknowledge that you have fully read, understood, and agreed to all terms in this notice without reservation. If you do not agree, discontinue use and delete all related files immediately.
 
-The plugin provides **native pass-through execution for Anthropic Messages, OpenAI Chat Completions, and OpenAI Responses**, featuring full real-time streaming for deep reasoning traces (CoT), official subscription quota tracking, and online quota reset-card redemption. It requires no persistent browser instance, no enterprise CLI tools, and incurs zero gateway protocol-translation overhead.
+---
 
-> [!NOTE]
-> This is an independent open-source project codenamed "Doujie" (豆姐), designed to maintain a clear distinction from proprietary trademarks and provide general multi-protocol gateway bridging. It is not affiliated with ByteDance Ltd. Please see [NOTICE.md](NOTICE.md) and the disclaimer below.
+## Overview
+
+OMC Doujie OAuth extends CLIProxyAPI with multi-protocol gateway compatibility. Connect through QR pairing or import an existing local desktop client session to access compatible conversational large language models.
+
+The plugin provides **native pass-through execution for Anthropic Messages, OpenAI Chat Completions, and OpenAI Responses**, featuring full real-time streaming for deep reasoning traces (CoT), quota window tracking, and quota reset-card redemption. It requires no persistent browser instance, no enterprise CLI tools, and incurs zero gateway protocol-translation overhead.
 
 ---
 
@@ -35,9 +43,9 @@ The plugin provides **native pass-through execution for Anthropic Messages, Open
 - 🧠 **Deep-Think & Reasoning Streaming**: Seamlessly preserves Chain-of-Thought (CoT) traces. Claude `thinking` blocks, OpenAI `reasoning_content` deltas, and Responses reasoning summaries are delivered in real time.
 - 🔑 **Dual Authentication Modes**:
   - **Mobile QR Sign-In (`doubao`)**: Generates a secure login QR code within the CPA management dashboard for mobile app authorization.
-  - **Zero-Touch Windows Desktop Import (`doubao-desktop`)**: Directly reads local desktop client session credentials on Windows without scanning. Eliminates account profile mismatches between mobile and PC logins. A standalone headless Python script is also included for server environments.
-- 📊 **Official Quota & Reset-Card Integration**:
-  - Directly syncs official subscription quotas and reset cards using authorized user sessions.
+  - **Zero-Touch Local Session Import (`doubao-desktop`)**: Directly reads local desktop client session credentials without scanning. Eliminates account profile mismatches between mobile and PC logins. A standalone headless Python script is also included for server environments.
+- 📊 **Usage Monitoring & Quota Reset Integration**:
+  - Synchronizes account quota windows and reset-card inventory using authorized user sessions.
   - Accurately reports real `7d` and `5h` rolling quota buckets, actual usage numbers (e.g., `used 314 / 2100`), and second-precise reset timestamps.
   - Native support for **Quota Reset Cards**: track available card balance and redeem cards with one click from the CPA panel. Gracefully falls back to local request estimation for free-tier accounts.
 - 🛡️ **Dual Channel Architecture**:
@@ -117,12 +125,12 @@ Start or restart your CPA core process.
 
 ## Authentication Guide
 
-### Option A: Windows Desktop Session Import (Recommended)
+### Option A: Local Client Session Import (Recommended)
 
-If you have the official desktop client installed and signed in on Windows:
+If you have already signed in on your local desktop client:
 1. Open the CPA management panel, navigate to OAuth / Sign-in providers, and click **豆姐（桌面端导入）**.
 2. The plugin reads the local desktop client session and writes the credential instantly.
-3. No mobile scanning required, completely avoiding phone/desktop profile mismatches (retaining your existing subscription and reset cards).
+3. No mobile scanning required, completely avoiding profile mismatches between devices.
 
 > You can also run the headless Python helper on servers:
 > ```bash
@@ -137,9 +145,9 @@ If you have the official desktop client installed and signed in on Windows:
 
 ---
 
-## Official Quota & Reset Cards
+## Quota Tracking & Reset Cards
 
-The plugin connects with account subscription profiles to synchronize quota details:
+The plugin synchronizes subscription profiles to monitor quota windows:
 
 - **Real-Time Display**: In the CPA management dashboard, the plugin shows genuine `7d` / `5h` buckets with actual usage numbers (e.g., `used 314 / 2100`) and the exact reset time.
 - **Reset Card Action**: When reset cards are available, an **额度重置卡** card appears with a **Reset Quota** action button, allowing you to replenish your quota with one click.
@@ -279,7 +287,7 @@ make package
 
 ---
 
-## License & Disclaimer
+## License & Legal Notice
 
 - Distributed under the [MIT License](LICENSE).
-- **Disclaimer**: This is an open-source adapter tool codenamed "Doujie" (豆姐), designed to maintain a clear distinction from proprietary trademarks and provide general multi-protocol gateway bridging. It is not affiliated with, endorsed by, or sponsored by ByteDance Ltd. "Doubao" and "豆包" are trademarks of their respective owners. You are solely responsible for ensuring compliance with any applicable terms of service.
+- **Disclaimer**: This software is an independent open-source technical exploration. The authors and contributors provide no warranties and assume no liability for any direct or indirect consequences, losses, or legal disputes resulting from the use of this project. Users are solely responsible for ensuring compliance with all applicable laws and third-party terms.
