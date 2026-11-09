@@ -27,13 +27,17 @@ var doubaoModels = []modelSpec{
 	{ID: "doubao-pro", Display: "豆姐 Pro", Context: 131072, Output: 16384},
 	{
 		ID:          "doubao-video",
-		Display:     "豆姐 Seedance 2.5",
-		Description: "Generate a video through the signed-in Doubao session and return the video URL.",
+		Display:     "豆姐视频（自动）",
+		Description: "Generate a video through the signed-in Doubao agent; the agent selects the available model.",
 		Context:     8192,
 		Output:      2048,
-		Version:     "seedance_2.5",
+		Version:     "auto",
 		Outputs:     []string{"text", "video"},
 	},
+	{ID: "seedance-2.5", Display: "Seedance 2.5", Description: "Use Seedance 2.5 through the Doubao video agent.", Context: 8192, Output: 2048, Version: "2.5", Outputs: []string{"text", "video"}},
+	{ID: "seedance-2.0", Display: "Seedance 2.0", Description: "Use Seedance 2.0 through the Doubao video agent.", Context: 8192, Output: 2048, Version: "2.0", Outputs: []string{"text", "video"}},
+	{ID: "seedance-2.0-fast", Display: "Seedance 2.0 Fast", Description: "Use Seedance 2.0 Fast through the Doubao video agent.", Context: 8192, Output: 2048, Version: "2.0-fast", Outputs: []string{"text", "video"}},
+	{ID: "seedance-2.0-mini", Display: "Seedance 2.0 Mini", Description: "Use Seedance 2.0 Mini through the Doubao video agent.", Context: 8192, Output: 2048, Version: "2.0-mini", Outputs: []string{"text", "video"}},
 }
 
 func staticModels() []pluginapi.ModelInfo {

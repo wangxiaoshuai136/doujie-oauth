@@ -56,6 +56,18 @@ The plugin does not auto-detect regions. Choose either **豆姐（国内版）**
 3. Scan it with the mobile app and confirm authorization.
 4. The plugin completes the session handshake and writes a `doubao` auth file.
 
+### Option C: Browser Account Sign-In (No QR)
+
+Choose **豆姐（账号登录）**. The plugin opens a visible Edge/Chrome window with
+an isolated profile and the Doubao login page. Enter the phone number, password
+or SMS code there. A loopback-only DevTools connection reads the resulting
+Doubao cookies; the plugin never receives or stores the password. The browser
+and temporary profile are closed after success or expiry.
+
+This mode requires a desktop Windows session and Microsoft Edge or Google
+Chrome. Set `DOUJIE_BROWSER_PATH` if the browser is installed in a non-standard
+location.
+
 ### Session Lifetime
 
 Sessions are long-lived. When upstream rejects credentials (HTTP 401),
@@ -104,6 +116,17 @@ Rules:
 | Responses | `instructions`, `input`, `reasoning.effort` | `response.output_text.delta`, `response.completed` |
 
 Token counts are estimated where upstream streaming chunks do not supply usage totals.
+
+## 5.1 Video Models
+
+The plugin advertises `doubao-video`, `seedance-2.5`, `seedance-2.0`,
+`seedance-2.0-fast`, and `seedance-2.0-mini`. Use a normal Chat Completions
+request. The first request returns a short plan; send `"confirm": true` (or a
+follow-up user message such as `确认生成`) to submit exactly one video task. The
+final MP4 URL is returned in the assistant message.
+
+Video generation uses the signed-in Doubao agent and web-session quota. It is
+currently text-to-video only.
 
 ## 6. Quota Card and Reset Cards
 

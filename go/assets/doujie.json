@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "plugin_id": "doujie-oauth",
-  "plugin_version": "0.1.3",
+  "plugin_version": "0.1.4",
   "i18n": {
     "description": {
-      "zh": "非官方豆姐（Doujie）提供商插件：支持国内版、国际版（Dola）显式扫码入口与本地桌面会话导入。地区不会自动切换。与相关商业商标无关。",
-      "en": "Unofficial Doujie provider: explicit domestic and international (Dola) QR entries plus desktop session import. Regions never switch automatically. Not affiliated with any commercial trademarks.",
-      "zh-Hant": "非官方豆姐（Doujie）提供者外掛：支援掃碼與本機桌面對話導入，向 CLIProxyAPI 暴露對話大模型。與相關商業商標無關。"
+      "zh": "非官方豆姐（Doujie）提供商插件：支持国内版、国际版（Dola）、桌面会话导入与独立浏览器账号登录。地区不会自动切换。与相关商业商标无关。",
+      "en": "Unofficial Doujie provider: domestic and international (Dola) portals, desktop session import, and isolated-browser account sign-in. Regions never switch automatically. Not affiliated with any commercial trademarks.",
+      "zh-Hant": "非官方豆姐（Doujie）提供者外掛：支援國內版、國際版（Dola）、桌面工作階段匯入與獨立瀏覽器帳號登入。地區不會自動切換。與相關商業商標無關。"
     }
   }
 }

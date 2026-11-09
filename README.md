@@ -44,10 +44,16 @@ instead of switching regions automatically by IP or browser language.
 | Doujie (domestic) | `doubao` | Default domestic site; uses `assets/doubao.png` |
 | Doujie international (Dola) | `dola` | Independent international site; uses `assets/dola.png`; subject to upstream regional policy |
 | Doujie desktop import | `doubao-desktop` | Windows local session import; produces a domestic credential |
+| Doujie account sign-in | `doubao-account` | Opens an isolated Edge/Chrome window for phone, password or SMS login; no QR code |
 
 QR scanning is optional. The desktop entry imports the local session without a
 phone. If Doubao is running and holds its cookie database open, the plugin opens
 a no-QR import page: quit Doubao from the tray, then retry on that page.
+
+The account entry opens a real Doubao login page in an isolated browser profile.
+Sign in there with the phone number, password or SMS code you already use; the
+plugin reads the resulting session through a loopback-only DevTools connection.
+It never stores the account password.
 
 On panels that render per-entry metadata (CPA v8.0.51+), each entry appears as
 its own card with its own name and icon. Picking an entry picks the site; the
@@ -76,6 +82,7 @@ The plugin needs no local callback listener and no separate browser process.
   auto-switching regions.
 - Windows desktop session import to avoid phone/desktop account mismatch.
 - No-QR fallback page for a locked desktop cookie database.
+- Browser-based account sign-in for phone, password or SMS login without scanning.
 - Native Anthropic Messages, OpenAI Chat Completions and OpenAI Responses
   execution.
 - Deep-thinking and reasoning streaming.
@@ -96,9 +103,34 @@ The plugin needs no local callback listener and no separate browser process.
 | `doubao-seed-1.6-thinking` | 豆姐 Seed 1.6 思考 | 256k / 32k |
 | `doubao-seed-1.6-flash` | 豆姐 Seed 1.6 Flash | 256k / 32k |
 | `doubao-pro` | 豆姐 Pro | 128k / 16k |
+| `doubao-video` | 豆姐视频（自动） | 8k / 2k |
+| `seedance-2.5` | Seedance 2.5 | 8k / 2k |
+| `seedance-2.0` | Seedance 2.0 | 8k / 2k |
+| `seedance-2.0-fast` | Seedance 2.0 Fast | 8k / 2k |
+| `seedance-2.0-mini` | Seedance 2.0 Mini | 8k / 2k |
 
 Model IDs containing `think` or `reason` enable deep thinking automatically;
 `deep_think: true` forces it globally.
+
+### Video models
+
+`doubao-video` and `seedance-*` use the signed-in Doubao video agent. The first
+chat request returns a short plan only. After the user confirms, set
+`"confirm": true` (or send a second user message such as `确认生成`); the plugin
+then submits one video task and returns the final MP4 URL in the normal chat
+response.
+
+```json
+{
+  "model": "seedance-2.0",
+  "confirm": true,
+  "messages": [{"role": "user", "content": "A sunset over the sea, slow dolly in."}]
+}
+```
+
+The current flow is text-to-video. Model choice is passed to the Doubao agent as
+a prompt-level preference; duration and resolution depend on the account's
+available model capabilities.
 
 ## Installation
 

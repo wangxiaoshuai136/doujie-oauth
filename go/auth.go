@@ -35,6 +35,7 @@ type loginFlow struct {
 	Expires     time.Time
 	QRPNG       []byte
 	ImportToken string
+	Browser     *browserLogin
 	Imported    *pluginapi.AuthData
 }
 
@@ -119,6 +120,19 @@ func completeManualImport(token string, auth pluginapi.AuthData) bool {
 	return false
 }
 
+const browserEntryID = "doubao-account"
+
+func closeAllFlows() {
+	flowMu.Lock()
+	defer flowMu.Unlock()
+	for id, flow := range flowStore {
+		if flow != nil && flow.Browser != nil {
+			flow.Browser.Close()
+		}
+		delete(flowStore, id)
+	}
+}
+
 func browserHeaders(extra http.Header) http.Header {
 	return browserHeadersForSite(siteCN, extra)
 }
@@ -176,6 +190,9 @@ func startLogin(req pluginapi.AuthLoginStartRequest, sender httpSender) (plugina
 	key, err := loadStateKey(req.Host.AuthDir)
 	if err != nil {
 		return out, err
+	}
+	if req.Provider == browserEntryID {
+		return startBrowserAccountLogin(req, key)
 	}
 	if req.Provider == desktopEntryID {
 		return startDesktopImport(req, sender, key)
@@ -316,8 +333,11 @@ func pollLogin(req pluginapi.AuthLoginPollRequest, sender httpSender) (pluginapi
 		return pluginapi.AuthLoginPollResponse{Status: pluginapi.AuthLoginStatusError, Message: "登录状态无效，请重新开始"}, nil
 	}
 	if time.Now().After(expires) {
+		if flow := peekFlow(flowID); flow != nil && flow.Browser != nil {
+			flow.Browser.Close()
+		}
 		takeFlow(flowID)
-		return pluginapi.AuthLoginPollResponse{Status: pluginapi.AuthLoginStatusError, Message: "二维码已过期，请重新开始"}, nil
+		return pluginapi.AuthLoginPollResponse{Status: pluginapi.AuthLoginStatusError, Message: "登录流程已过期，请重新开始"}, nil
 	}
 	flow := peekFlow(flowID)
 	if flow == nil {
@@ -326,6 +346,21 @@ func pollLogin(req pluginapi.AuthLoginPollRequest, sender httpSender) (pluginapi
 	if flow.Imported != nil {
 		takeFlow(flowID)
 		return pluginapi.AuthLoginPollResponse{Status: pluginapi.AuthLoginStatusSuccess, Auth: *flow.Imported}, nil
+	}
+	if flow.Browser != nil {
+		cookies, browserErr := flow.Browser.PollCookies()
+		if browserErr == nil && strings.TrimSpace(cookies["sessionid"]) != "" {
+			auth, authErr := authFromCookies(cookies, siteCN)
+			if authErr != nil {
+				return pluginapi.AuthLoginPollResponse{Status: pluginapi.AuthLoginStatusError, Message: authErr.Error()}, nil
+			}
+			auth.Metadata["oauth_provider"] = browserEntryID
+			flow.Browser.Close()
+			takeFlow(flowID)
+			return pluginapi.AuthLoginPollResponse{Status: pluginapi.AuthLoginStatusSuccess, Auth: auth}, nil
+		}
+		pending.Message = "请在浏览器中完成账号登录"
+		return pending, nil
 	}
 	if flow.ImportToken != "" {
 		pending.Message = "等待手动导入登录态"
@@ -427,7 +462,7 @@ func authFromCookies(jar map[string]string, site string) (pluginapi.AuthData, er
 }
 
 func parseAuth(req pluginapi.AuthParseRequest) pluginapi.AuthParseResponse {
-	if req.Provider != entryID && req.Provider != internationalEntryID && req.Provider != desktopEntryID && req.Provider != credentialProvider {
+	if req.Provider != entryID && req.Provider != internationalEntryID && req.Provider != desktopEntryID && req.Provider != browserEntryID && req.Provider != credentialProvider {
 		return pluginapi.AuthParseResponse{}
 	}
 	var persisted struct {
@@ -576,4 +611,36 @@ func startDesktopImport(req pluginapi.AuthLoginStartRequest, sender httpSender, 
 		Metadata:  metadata,
 	}
 	return out, nil
+}
+
+func startBrowserAccountLogin(req pluginapi.AuthLoginStartRequest, key []byte) (pluginapi.AuthLoginStartResponse, error) {
+	var out pluginapi.AuthLoginStartResponse
+	browser, err := startBrowserLogin()
+	if err != nil {
+		return out, fmt.Errorf("cannot open browser sign-in: %w", err)
+	}
+	flowID, err := randomHex(16)
+	if err != nil {
+		browser.Close()
+		return out, errors.New("cannot generate login state")
+	}
+	expires := time.Now().Add(flowsTTL)
+	putFlow(flowID, &loginFlow{Site: siteCN, Expires: expires, Browser: browser})
+	state, err := sealState(key, flowID, expires)
+	if err != nil {
+		browser.Close()
+		takeFlow(flowID)
+		return out, err
+	}
+	base := absoluteBase(getConfig().PublicBaseURL, req.BaseURL)
+	return pluginapi.AuthLoginStartResponse{
+		Provider:  credentialProvider,
+		URL:       base + resourcePrefix + "/account.html",
+		State:     state,
+		ExpiresAt: expires.UTC(),
+		Metadata: map[string]any{
+			"source":  "browser-login",
+			"message": "已打开浏览器，请使用手机号、密码或短信验证码完成登录",
+		},
+	}, nil
 }

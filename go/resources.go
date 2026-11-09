@@ -74,6 +74,10 @@ func handleManagementGet(req pluginapi.ManagementRequest) (pluginapi.ManagementR
 		body = []byte(strings.ReplaceAll(manualImportPage, "{{TOKEN}}", html.EscapeString(token)))
 		contentType = "text/html; charset=utf-8"
 		cacheControl = "no-store"
+	case req.Path == resourcePrefix+"/account.html":
+		body = []byte(browserAccountPage)
+		contentType = "text/html; charset=utf-8"
+		cacheControl = "no-store"
 	case req.Path == resourcePrefix+"/qr.png":
 		flow := newestFlow()
 		if flow == nil || len(flow.QRPNG) == 0 {
@@ -164,4 +168,16 @@ const manualImportPage = `<!doctype html>
 <p><a class="button" href="manual.html?token={{TOKEN}}&amp;action=desktop">重新读取桌面端</a></p>
 <p class="small">如果托盘里还有豆包进程，请在任务管理器结束它后再点。导入成功后无需扫码，CPA 面板会自动完成授权。</p>
 <p class="small" style="margin-top:28px">此页 5 分钟后失效。若已失效，请关闭本页并回到 CPA 面板重新开始。</p>
+</main></body></html>`
+
+const browserAccountPage = `<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>豆姐账号登录</title>
+<style>:root{color-scheme:dark}body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#0f172a;color:#e2e8f0;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}main{width:min(560px,100%);background:#1e293b;border-radius:18px;padding:34px;box-shadow:0 24px 70px rgba(0,0,0,.45)}h1{font-size:24px;margin:0 0 12px}p{line-height:1.7;color:#94a3b8}a{color:#38bdf8}.note{border-left:3px solid #38bdf8;background:#13233a;padding:12px 14px;border-radius:8px;color:#bae6fd}.small{font-size:13px;color:#64748b}</style></head>
+<body><main><h1>请在浏览器中完成登录</h1>
+<p>插件已打开一个独立的 Edge/Chrome 窗口。你可以使用手机号验证码、账号密码或飞书账号登录，不需要扫码。</p>
+<div class="note">登录成功后，CPA 会自动读取该浏览器会话并完成授权。不要在这个窗口里打开其他账号的私人页面。</div>
+<p><a href="https://www.doubao.com/chat/" target="_blank" rel="noreferrer">如果浏览器没有自动弹出，点这里打开豆包</a></p>
+<p class="small">此窗口会在 5 分钟后失效；关闭本页不会中断已打开浏览器的登录。</p>
 </main></body></html>`

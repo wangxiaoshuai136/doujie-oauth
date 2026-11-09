@@ -8,7 +8,7 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
 )
 
-var pluginVersion = "0.1.3"
+var pluginVersion = "0.1.4"
 
 type rpcAuthStart struct {
 	pluginapi.AuthLoginStartRequest
@@ -69,7 +69,6 @@ func registration() any {
 				{Name: "public_base_url", Type: pluginapi.ConfigFieldTypeString, Description: "Optional absolute CPA base URL used to render the login QR image when the panel does not supply one."},
 				{Name: "endpoint", Type: pluginapi.ConfigFieldTypeEnum, EnumValues: []string{"samantha", "chat"}, Description: "Upstream endpoint family: samantha (default, direct HTTP) or chat (desktop completion, usually needs an external signer)."},
 				{Name: "app_version", Type: pluginapi.ConfigFieldTypeString, Description: "Doubao desktop client version sent in request parameters (default 2.1.7)."},
-				{Name: "video_timeout_seconds", Type: pluginapi.ConfigFieldTypeInteger, Default: 300, Description: "Maximum seconds to wait for a Doubao video task (30–1800, default 300)."},
 			},
 		},
 		"capabilities": map[string]any{
@@ -99,16 +98,18 @@ func handleMethod(method string, raw []byte) (any, error) {
 		}
 		return registration(), nil
 	case "plugin.quiesce", "plugin.shutdown":
+		closeAllFlows()
 		return map[string]any{}, nil
 	case "auth.identifier":
 		return map[string]any{
 			"identifier":           entryID,
-			"identifiers":          []string{entryID, internationalEntryID, desktopEntryID},
+			"identifiers":          []string{entryID, internationalEntryID, desktopEntryID, browserEntryID},
 			"credential_providers": []string{credentialProvider},
 			"entries": []map[string]any{
 				{"identifier": entryID, "name": "豆姐（国内版）", "logo": resourceAssetURL("doubao.png")},
 				{"identifier": internationalEntryID, "name": "豆姐国际版（Dola）", "logo": resourceAssetURL("dola.png")},
 				{"identifier": desktopEntryID, "name": "豆姐（桌面端导入）", "logo": resourceAssetURL("doubao.png")},
+				{"identifier": browserEntryID, "name": "豆姐（账号登录）", "logo": resourceAssetURL("doubao.png")},
 			},
 		}, nil
 	case "executor.identifier", "model.identifier":
@@ -147,6 +148,7 @@ func handleMethod(method string, raw []byte) (any, error) {
 			{"path": "/qr.png", "menu": "", "description": "Login QR code for the latest sign-in flow."},
 			{"path": "/imported.html", "menu": "", "description": "Desktop import result page."},
 			{"path": "/manual.html", "menu": "", "description": "No-QR desktop import retry page."},
+			{"path": "/account.html", "menu": "", "description": "Browser-based account sign-in page."},
 			{"path": "/doubao.png", "menu": "", "description": "Domestic sign-in logo."},
 			{"path": "/dola.png", "menu": "", "description": "International sign-in logo."},
 			{"path": "/doujie.json", "menu": "", "description": "Public plugin declaration."},

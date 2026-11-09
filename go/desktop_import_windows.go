@@ -266,7 +266,8 @@ func tokenForProcess(pid uint32) (windows.Token, string, error) {
 		return 0, "", err
 	}
 	var token windows.Token
-	if err = windows.DuplicateTokenEx(source, windows.TOKEN_QUERY|windows.TOKEN_IMPERSONATE|windows.TOKEN_DUPLICATE, nil, windows.SecurityImpersonation, windows.TokenImpersonation, &token); err != nil {
+	desiredAccess := uint32(windows.TOKEN_QUERY | windows.TOKEN_IMPERSONATE | windows.TOKEN_DUPLICATE | windows.TOKEN_ASSIGN_PRIMARY)
+	if err = windows.DuplicateTokenEx(source, desiredAccess, nil, windows.SecurityImpersonation, windows.TokenPrimary, &token); err != nil {
 		return 0, "", err
 	}
 	return token, profile, nil

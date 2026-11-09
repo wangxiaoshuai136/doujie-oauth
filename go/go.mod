@@ -3,6 +3,7 @@ module github.com/wangxiaoshuai136/doujie-oauth
 go 1.27.0
 
 require (
+	github.com/gorilla/websocket v1.5.3
 	github.com/router-for-me/CLIProxyAPI/v8 v8.0.51
 	gopkg.in/yaml.v3 v3.0.1
 )

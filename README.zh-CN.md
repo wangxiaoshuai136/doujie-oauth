@@ -40,9 +40,13 @@ Completions、OpenAI Responses 原生执行，以及标准化配额与重置卡�
 | 豆姐（国内版） | `doubao` | 默认国内站点，使用 `assets/doubao.png` |
 | 豆姐国际版（Dola） | `dola` | 独立国际站点，使用 `assets/dola.png`；受上游地区策略影响 |
 | 豆姐（桌面端导入） | `doubao-desktop` | Windows 本地会话无感导入，归入国内凭证 |
+| 豆姐（账号登录） | `doubao-account` | 打开独立 Edge/Chrome 窗口，支持手机号、密码或短信验证码登录，无需扫码 |
 
 扫码不是必选项。桌面端入口无需手机；若豆包客户端正在运行并占用 Cookies 数据库，
 插件会自动打开免扫码导入页：从托盘完全退出豆包后，在页面上重试即可。
+
+账号登录入口会用独立浏览器配置打开豆包真实登录页。你可以直接输入手机号、密码或
+短信验证码；插件只通过本机回环 DevTools 读取登录后的会话，不保存账号密码。
 
 在支持逐入口元数据的面板（CPA v8.0.51+）上，每个入口各自成为一张卡片，带自己的
 名称和图标。选入口即选站点；插件不会自动切换地区。
@@ -65,6 +69,7 @@ OAuth 发起和轮询使用 CPA 原生受认证管理 API，公共插件资源�
 - 豆姐国内版与 Dola 国际版两个独立扫码入口，默认国内版，从不自动换区。
 - Windows 桌面端会话导入，避免手机端与桌面端账号不一致。
 - 桌面 Cookies 被占用时提供免扫码重试页。
+- 独立浏览器账号登录，支持手机号、密码或短信验证码，无需扫码。
 - 原生 Anthropic Messages、OpenAI Chat Completions、OpenAI Responses 执行。
 - 深度思考与思维链流式回传。
 - 真实 `5h` / `7d` 配额窗口、重置时间与额度重置卡核销。
@@ -84,9 +89,31 @@ OAuth 发起和轮询使用 CPA 原生受认证管理 API，公共插件资源�
 | `doubao-seed-1.6-thinking` | 豆姐 Seed 1.6 思考 | 256k / 32k |
 | `doubao-seed-1.6-flash` | 豆姐 Seed 1.6 Flash | 256k / 32k |
 | `doubao-pro` | 豆姐 Pro | 128k / 16k |
+| `doubao-video` | 豆姐视频（自动） | 8k / 2k |
+| `seedance-2.5` | Seedance 2.5 | 8k / 2k |
+| `seedance-2.0` | Seedance 2.0 | 8k / 2k |
+| `seedance-2.0-fast` | Seedance 2.0 Fast | 8k / 2k |
+| `seedance-2.0-mini` | Seedance 2.0 Mini | 8k / 2k |
 
 模型标识包含 `think` 或 `reason` 时自动开启深度思考；也可用 `deep_think: true`
 强制全局开启。
+
+### 视频模型
+
+`doubao-video` / `seedance-*` 走豆包会话视频 agent。首次调用只返回生成方案；
+用户确认后，在请求体加 `"confirm": true`，或在下一条用户消息中回复“确认生成”，
+插件会提交一次视频任务并把最终 MP4 地址放在普通 chat 回复中。
+
+```json
+{
+  "model": "seedance-2.0",
+  "confirm": true,
+  "messages": [{"role": "user", "content": "海边日落，镜头缓慢推进"}]
+}
+```
+
+当前为文生视频；`seedance-*` 选择通过提示词交给豆包 agent，时长和分辨率由账号当前
+可用能力决定。
 
 ## 安装
 
