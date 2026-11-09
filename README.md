@@ -5,12 +5,13 @@
 <h1 align="center">OMC Doubao OAuth</h1>
 
 <p align="center">
-  Unofficial Doubao (豆包) provider for
-  <a href="https://github.com/router-for-me/CLIProxyAPI">CLIProxyAPI</a>
+  High-performance unofficial Doubao (豆包) provider plugin for
+  <a href="https://github.com/router-for-me/CLIProxyAPI">CLIProxyAPI (CPA)</a>
 </p>
 
 <p align="center">
   <a href="https://github.com/wangxiaoshuai136/omc-doubao-oauth/actions/workflows/build.yml"><img src="https://github.com/wangxiaoshuai136/omc-doubao-oauth/actions/workflows/build.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/wangxiaoshuai136/omc-doubao-oauth/releases/latest"><img src="https://img.shields.io/github/v/release/wangxiaoshuai136/omc-doubao-oauth?color=blue&label=release" alt="Latest Release"></a>
   <img src="https://img.shields.io/badge/CLIProxyAPI-v8+-4f46e5" alt="CLIProxyAPI v8+">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license">
 </p>
@@ -19,205 +20,266 @@
   <a href="README.zh-CN.md">简体中文</a> · English
 </p>
 
-OMC Doubao OAuth adds the `doubao` provider to CLIProxyAPI. Sign in with a
-Doubao web/desktop account by scanning a QR code, then use Doubao chat models
-through CPA with **native Anthropic Messages, OpenAI Chat Completions and
-OpenAI Responses support** — no local browser, no Doubao CLI, and no
-format-conversion hop for those three protocols.
+OMC Doubao OAuth brings Doubao models to CLIProxyAPI. Sign in through the mobile app QR code or effortlessly import an existing Windows desktop client session without scanning.
 
-This is an independent, unofficial project. It is not affiliated with
-ByteDance. See [NOTICE.md](NOTICE.md) and the disclaimer below.
+The plugin provides **native pass-through execution for Anthropic Messages, OpenAI Chat Completions, and OpenAI Responses**, featuring full real-time streaming for deep reasoning traces (CoT), official subscription quota tracking, and online quota reset-card redemption. It requires no persistent browser instance, no enterprise CLI tools, and incurs zero gateway protocol-translation overhead.
 
-## Native protocols
+> [!NOTE]
+> This is an independent open-source project and is not affiliated with ByteDance Ltd. Please see [NOTICE.md](NOTICE.md) and the disclaimer below.
 
-The plugin declares all three formats in its executor capability, so CPA hands
-requests straight to the plugin instead of translating them first:
+---
 
-| Client endpoint | CPA format | Native | Notes |
+## Key Features
+
+- ⚡ **Native Tri-Protocol Pass-Through**: Implements Claude, OpenAI, and OpenAI Response formats directly within the executor. CPA routes requests straight to the plugin, eliminating intermediate gateway translation hops and formatting loss.
+- 🧠 **Deep-Think & Reasoning Streaming**: Seamlessly preserves Chain-of-Thought (CoT) traces. Claude `thinking` blocks, OpenAI `reasoning_content` deltas, and Responses reasoning summaries are delivered in real time.
+- 🔑 **Dual Authentication Modes**:
+  - **Mobile QR Sign-In (`doubao`)**: Generates a secure login QR code within the CPA management dashboard for mobile app authorization.
+  - **Zero-Touch Windows Desktop Import (`doubao-desktop`)**: Directly reads local desktop client session credentials on Windows without scanning. Eliminates account profile mismatches between mobile and PC logins. A standalone headless Python script is also included for server environments.
+- 📊 **Official Quota & Reset-Card Integration**:
+  - Directly syncs official subscription quotas and reset cards using authorized user sessions.
+  - Accurately reports real `7d` and `5h` rolling quota buckets, actual usage numbers (e.g., `used 314 / 2100`), and second-precise reset timestamps.
+  - Native support for **Quota Reset Cards**: track available card balance and redeem cards with one click from the CPA panel. Gracefully falls back to local request estimation for free-tier accounts.
+- 🛡️ **Dual Channel Architecture**:
+  - `samantha` (default): Lightweight direct channel operating with session credentials, requiring zero external signing dependencies.
+  - `chat`: Secondary channel supporting pluggable external signer adapters (`external`) for advanced networking setups.
+- 📦 **Automated Cross-Platform Binaries**: Precompiled shared libraries for Windows (amd64), Linux (amd64/arm64), and macOS (amd64/arm64) automatically packaged and released via GitHub Actions.
+
+---
+
+## Supported Models
+
+The plugin registers Doubao models with intelligent reasoning detection:
+
+| Model ID | Display Name | Context / Output Limit | Deep Think | Description |
+| --- | --- | --- | --- | --- |
+| `doubao` | 豆包 Auto | 256k / 32k | Auto-detected | Default smart-routing model |
+| `doubao-seed-2.0` | 豆包 Seed 2.0 | 256k / 32k | Auto-detected | Flagship next-generation general model |
+| `doubao-seed-2.0-lite` | 豆包 Seed 2.0 Lite | 256k / 32k | Supported | Low-latency, lightweight variant |
+| `doubao-seed-2.0-code` | 豆包 Seed 2.0 Code | 256k / 32k | Supported | Specialized for programming & refactoring |
+| `doubao-seed-1.6` | 豆包 Seed 1.6 | 256k / 32k | Supported | Standard 1.6 generation model |
+| `doubao-seed-1.6-thinking` | 豆包 Seed 1.6 思考 | 256k / 32k | **Enabled by default** | Deep reasoning / CoT specialized model |
+| `doubao-seed-1.6-flash` | 豆包 Seed 1.6 Flash | 256k / 32k | Supported | High-throughput, fast-response variant |
+| `doubao-pro` | 豆包 Pro | 128k / 16k | Supported | Classic Pro model |
+
+> **Tip**: Any model ID containing `think` or `reason` automatically enables deep thinking mode. You can also configure `deep_think: true` to enforce it globally.
+
+---
+
+## Native Protocol Mapping
+
+| Client Endpoint | CPA Protocol | Native | Streaming & Reasoning Behavior |
 | --- | --- | --- | --- |
-| `POST /v1/messages` | `claude` | yes | `thinking` blocks are mapped to Doubao deep-think traces |
-| `POST /v1/chat/completions` | `openai` | yes | reasoning is exposed as `reasoning_content` deltas |
-| `POST /v1/responses` | `openai-response` | yes | reasoning summary + `output_text` events |
+| `POST /v1/messages` | `claude` | Yes | `thinking` blocks mapped to deep reasoning; content streamed via `content_block_delta` |
+| `POST /v1/chat/completions` | `openai` | Yes | Reasoning streamed incrementally via `delta.reasoning_content` |
+| `POST /v1/responses` | `openai-response` | Yes | Emits reasoning summary and `response.output_text.delta` events |
 
-Other client protocols (Gemini, Codex, ...) are converted by CPA to one of the
-three formats above before reaching the plugin.
+Other client protocols (Gemini, Codex, etc.) are converted by CPA into one of the three formats above before entering the plugin.
 
-## How it works
+---
 
-1. **QR sign-in.** The plugin starts Doubao's passport QR flow
-   (`/passport/safe/csrf_token` → `/passport/web/get_qrcode` →
-   `/passport/web/check_qrconnect`) and stores the resulting `sessionid`,
-   `ttwid` and CSRF cookies in a CPA auth file.
-2. **Two upstream endpoints.**
-   - `samantha` (default): `POST /samantha/chat/completion`, a plain JSON/SSE
-     endpoint. Works with session cookies and an optional `msToken`.
-   - `chat`: `POST /chat/completion`, the desktop/CLI main entry. It uses
-     `content_block` payloads and normally requires ByteDance request signing
-     (`a_bogus`). Point `signer_url` at a local signer service when you use it.
-3. **Pluggable signer.** The signing layer is an interface. The default
-   `none` mode sends requests as-is. `external` mode asks a local HTTP service
-   for the extra headers, so a browser-backed signer can be swapped in without
-   touching the plugin binary.
+## Quick Start
 
-## Requirements
+### 1. Download Prebuilt Libraries
 
-- CLIProxyAPI v8.0.51 or newer.
-- A Doubao account with access to the web/desktop chat product. The plugin uses
-  your normal account session; it does not need the Doubao CLI, which is
-  restricted to team/enterprise subscriptions.
-- The account's own quota/risk rules still apply.
+Download the archive matching your operating system and architecture from [GitHub Releases](https://github.com/wangxiaoshuai136/omc-doubao-oauth/releases/latest):
 
-## Install
+| OS Platform | Architecture | Archive File |
+| --- | --- | --- |
+| **Windows** | x86_64 (`amd64`) | `omc-doubao-oauth_0.1.0_windows_amd64.zip` (`omc-doubao-oauth.dll`) |
+| **Linux** | x86_64 (`amd64`) | `omc-doubao-oauth_0.1.0_linux_amd64.zip` (`omc-doubao-oauth.so`) |
+| **Linux** | ARM64 (`arm64`) | `omc-doubao-oauth_0.1.0_linux_arm64.zip` (`omc-doubao-oauth.so`) |
+| **macOS** | Apple Silicon (`arm64`) | `omc-doubao-oauth_0.1.0_darwin_arm64.zip` (`omc-doubao-oauth.dylib`) |
+| **macOS** | Intel (`amd64`) | `omc-doubao-oauth_0.1.0_darwin_amd64.zip` (`omc-doubao-oauth.dylib`) |
 
-Build the shared library for your platform and place it in CPA's plugin
-directory:
+Extract the shared library into your CPA plugins directory (e.g., `plugins/omc-doubao-oauth.dll`).
 
-```text
-omc-doubao-oauth.dll    Windows
-omc-doubao-oauth.dylib  macOS
-omc-doubao-oauth.so     Linux
-```
+### 2. Configure CPA
 
-Then enable it in CPA's configuration:
+Add the plugin configuration block to your `config.yaml`:
 
 ```yaml
 plugins:
   enabled: true
-  dir: /path/to/plugins
+  dir: plugins
   configs:
     omc-doubao-oauth:
       enabled: true
-      endpoint: samantha
-      signer: none
-      max_concurrency: 3
+      endpoint: samantha       # Recommended: samantha (direct channel, zero signing setup)
+      signer: none             # Signing mode: none or external
+      max_concurrency: 3       # Concurrent requests per account (1-100)
+      # public_base_url: http://127.0.0.1:8317  # Fallback CPA URL for building QR image paths
 ```
 
-Open the plugin's sign-in tile in your panel, scan the QR code with the Doubao
-mobile app, and confirm on the phone. Credentials are written to CPA's auth
-directory.
+Start or restart your CPA core process.
 
-## Configuration
+---
 
-| Field | Type | Default | Values |
-| --- | --- | --- | --- |
-| `endpoint` | enum | `samantha` | `samantha`, `chat` |
-| `signer` | enum | `none` | `none`, `external` |
-| `signer_url` | string | empty | absolute HTTP(S) URL, required for `external` |
-| `bot_id` | string | `7234781073513644036` | Doubao bot id used for every request |
-| `deep_think` | boolean | `false` | force deep thinking for every call |
-| `max_concurrency` | integer | `3` | 1–100 requests per credential |
-| `public_base_url` | string | empty | absolute CPA base URL used to render the QR image when the panel supplies no base URL |
-| `app_version` | string | `2.1.7` | desktop client version sent in query parameters |
+## Authentication Guide
 
-## Signer contract
+### Option A: Windows Desktop Session Import (Recommended)
 
-With `signer: external`, the plugin sends:
+If you have the official desktop client installed and signed in on Windows:
+1. Open the CPA management panel, navigate to OAuth / Sign-in providers, and click **豆包（桌面端导入）**.
+2. The plugin reads the local desktop client session and writes the credential instantly.
+3. No mobile scanning required, completely avoiding phone/desktop profile mismatches (retaining your existing subscription and reset cards).
 
-```http
-POST <signer_url>
-Content-Type: application/json
+> You can also run the headless Python helper on servers:
+> ```bash
+> python scripts/import_doubao_desktop.py --auth-dir "/path/to/cpa/oauth"
+> ```
 
-{"method":"POST","url":"https://www.doubao.com/chat/completion?...","headers":{"Cookie":["..."]},"body":"{...}"}
+### Option B: Mobile App QR Sign-In
+
+1. In the CPA panel, select **豆包**.
+2. A QR code generated by the plugin will be displayed (or accessed at `/v0/resource/plugins/omc-doubao-oauth/qr.png`).
+3. Scan and confirm using the mobile app. The session is saved into CPA's auth store.
+
+---
+
+## Official Quota & Reset Cards
+
+The plugin connects with account subscription profiles to synchronize quota details:
+
+- **Real-Time Display**: In the CPA management dashboard, the plugin shows genuine `7d` / `5h` buckets with actual usage numbers (e.g., `used 314 / 2100`) and the exact reset time.
+- **Reset Card Action**: When reset cards are available, an **额度重置卡** card appears with a **Reset Quota** action button, allowing you to replenish your quota with one click.
+- **Graceful Fallback**: For free accounts lacking server-side subscription windows, the plugin switches smoothly to local traffic estimation and labels it accordingly.
+
+---
+
+## Client Integration Examples
+
+### 1. Cursor / Windsurf / Cline
+- **API Base URL**: `http://127.0.0.1:8317/v1`
+- **API Key**: Your CPA management token or client key
+- **Model Name**: `doubao-seed-2.0` or `doubao-seed-1.6-thinking`
+
+### 2. Claude Code / Anthropic SDK
+```bash
+export ANTHROPIC_BASE_URL="http://127.0.0.1:8317"
+export ANTHROPIC_API_KEY="your-cpa-key"
 ```
 
-and expects:
+### 3. OpenAI Python SDK
+```python
+from openai import OpenAI
 
+client = OpenAI(
+    base_url="http://127.0.0.1:8317/v1",
+    api_key="your-cpa-key",
+)
+
+response = client.chat.completions.create(
+    model="doubao-seed-1.6-thinking",
+    messages=[{"role": "user", "content": "Which number is larger: 9.11 or 9.9? Explain step-by-step."}],
+    stream=True,
+)
+
+for chunk in response:
+    delta = chunk.choices[0].delta
+    if hasattr(delta, "reasoning_content") and delta.reasoning_content:
+        print(delta.reasoning_content, end="", flush=True)
+    if delta.content:
+        print(delta.content, end="", flush=True)
+```
+
+---
+
+## Configuration Reference
+
+| Field | Type | Default | Values | Description |
+| --- | --- | --- | --- | --- |
+| `endpoint` | string | `samantha` | `samantha`, `chat` | Connection channel: `samantha` (direct channel, recommended) or `chat` (secondary channel, supports external signer) |
+| `signer` | string | `none` | `none`, `external` | Signing mode |
+| `signer_url` | string | empty | absolute HTTP(S) URL | Required when `signer: external` (e.g., `http://127.0.0.1:8787/sign`) |
+| `bot_id` | string | `7234781073513644036` | string | Target bot ID |
+| `deep_think` | boolean | `false` | `true`, `false` | Force deep reasoning for every request |
+| `max_concurrency` | integer | `3` | `1` to `100` | Max concurrent requests per credential |
+| `public_base_url` | string | empty | absolute URL | External CPA URL for building panel QR code assets |
+| `app_version` | string | `2.1.7` | string | Client version identifier |
+
+---
+
+## External Signer Adapter (`signer: external`)
+
+When using `endpoint: chat`, the plugin can delegate extra header signing to `signer_url`:
+
+Request sent by plugin:
 ```json
-{"headers":{"X-Bogus":"...","msToken":"..."}}
+{
+  "method": "POST",
+  "url": "https://...",
+  "headers": { "Cookie": ["..."] },
+  "body": "{...}"
+}
 ```
 
-Headers named `Host`, `Content-Length`, `Connection` and `Cookie` are ignored;
-the plugin keeps its own cookies. A signer that drives a real browser page and
-lets the page's own request hook compute `a_bogus` is the most reliable option.
-See [docs/USAGE.md](docs/USAGE.md).
+Expected signer response:
+```json
+{
+  "headers": {
+    "Custom-Sign-Header": "..."
+  }
+}
+```
 
-## Quota display
+> Sensitive headers like `Host`, `Content-Length`, and `Cookie` are managed internally and ignored from the signer response. Keep the signer service bound to local loopback (`127.0.0.1`).
 
-The plugin reads Doubao's own account data instead of guessing:
+---
 
-| Endpoint | Purpose |
-| --- | --- |
-| `POST /alice/commerce/sale/subscription/quota/summary/` | subscription windows (`window_limit_section.window_limit_groups[].window_limits[]` with `used_amount` / `total_amount` / `start_time` / `end_time`) |
-| `POST /alice/commerce/marketing/card/balance/` | reset-card stock (`pc_quota_reset_card`, `quota_reset_card`) |
-| `POST /alice/commerce/marketing/card/use/` | consume one reset card |
+## Troubleshooting
 
-The panel therefore shows real `5h` / `7d` buckets with reset times, plus an
-**额度重置卡** card with the available card count and a reset action. When the
-account has no subscription windows (free account) the plugin falls back to a
-local request-based estimate and labels it as such.
+| Symptom | Cause | Recommended Action |
+| --- | --- | --- |
+| `401 reauth_required` | Session expired or invalidated on other devices | Remove the expired auth file and sign in again (or re-import from desktop) |
+| `429 quota_exhausted` | Quota exhausted or rate-limited | Check reset timestamp, or use the **Reset Quota** button to redeem a reset card |
+| Free tier instead of subscriber | Mobile app logged into a different profile | Use **豆包（桌面端导入）** to import the logged-in desktop profile directly |
+| No 5h bucket in quota card | Policy difference per subscription plan | Some plans only provide 7d rolling windows; 5h buckets appear automatically when provided |
+| `502 upstream_error` | Upstream network timeout or connection reset | Check internet connectivity; prefer the stable `endpoint: samantha` |
+| QR image 404 | Flow timed out (5-minute TTL) or plugin restarted | Refresh the panel page and initiate sign-in again |
 
-If the QR sign-in attached a different account than the one you use in the
-desktop client, pick the **豆包（桌面端导入）** sign-in entry instead. The plugin
-reads the local Doubao desktop cookie store (DPAPI + AES-GCM), writes a
-`doubao` credential for that account, and returns immediately — no QR needed.
+---
 
-The same import is available headless:
+## Development & Building
+
+The plugin is written in Go and cgo:
 
 ```bash
-python scripts/import_doubao_desktop.py --auth-dir <cpa-auth-dir>
-```
-
-Both paths work for free and subscribed accounts; the quota card simply shows
-the account's real windows when they exist, and a labeled local estimate when
-they do not.
-
-These commerce endpoints accept the session cookies directly and do **not**
-require the chat request signature. Chat requests still need the `a_bogus`
-signature on the `chat` endpoint; `samantha` works with cookies alone.
-## Limitations
-
-- Text-only in this version. Image, file and tool-use blocks are noted in the
-  prompt but not executed.
-- The `chat` endpoint usually needs signing; `samantha` is the default because
-  it works with cookies alone.
-- Doubao sessions can expire or be challenged by risk control. A 401 asks you
-  to sign in again; a 429 means the account's quota or rate limit was hit.
-- This is a reverse-engineered integration. It can break when Doubao changes
-  its client, and it may conflict with the vendor's terms of service. Use it
-  with your own account and at your own risk.
-
-## Development
-
-```sh
+# Download dependencies and run test suite
 cd go
 go mod download
 go test ./...
 go vet ./...
+
+# Build shared library for current OS (requires gcc/MinGW/clang)
+make build
+
+# Package release archives
+make package
 ```
 
-Build a native plugin (requires a C compiler because the plugin is a cgo
-shared library):
+---
 
-```sh
-make build          # native platform
-make package        # build + zip
-```
-
-CI builds release archives for Linux, macOS and Windows on tags.
-
-## Project layout
+## Project Structure
 
 ```text
-go/                 Go/cgo plugin implementation
-assets/             logo used by the plugin store and README
-docs/USAGE.md       operator guide, signer contract, troubleshooting
-.github/workflows/  tests, builds and tagged releases
+├── go/                     # Go/cgo plugin implementation
+│   ├── auth.go             # QR flow and credential lifecycle
+│   ├── desktop_import*.go  # Local desktop client session import
+│   ├── doubao.go           # Core protocol transport
+│   ├── formats.go          # Claude, OpenAI, and Responses serializers
+│   ├── models.go           # Model definitions and deep-think detection
+│   ├── quota_api.go        # Quota and reset-card handlers
+│   └── signer.go           # Pluggable external signer bridge
+├── assets/                 # Icons and static resources
+├── docs/                   # Detailed usage guides and signer specs
+├── scripts/                # Headless desktop import Python script
+└── .github/workflows/      # Automated multi-platform CI/CD release workflow
 ```
 
-## License
+---
 
-MIT. See [LICENSE](LICENSE).
+## License & Disclaimer
 
-## Disclaimer
-
-This project is unofficial and is not affiliated with, endorsed by, or
-sponsored by ByteDance. "Doubao" and "豆包" are trademarks of their respective
-owners. You are responsible for complying with the vendor's terms and for any
-consequences of using your account session through this plugin.
-
-
-
-
-
-
-
+- Distributed under the [MIT License](LICENSE).
+- **Disclaimer**: This is an open-source adapter tool providing local protocol bridging, and is not affiliated with, endorsed by, or sponsored by ByteDance Ltd. "Doubao" and "豆包" are trademarks of their respective owners. You are solely responsible for ensuring compliance with any applicable terms of service.

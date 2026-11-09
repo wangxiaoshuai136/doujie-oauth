@@ -1,8 +1,8 @@
-# Operator guide
+# Operator Guide
 
-## 1. Install the library
+## 1. Install the Library
 
-Build or download `omc-doubao-oauth.{dll,dylib,so}` and put it in the directory
+Build or download `omc-doubao-oauth.{dll,dylib,so}` and place it in the directory
 CPA scans for plugins (`plugins.dir`). Enable the plugin in `config.yaml`:
 
 ```yaml
@@ -21,111 +21,70 @@ plugins:
 `public_base_url` is only needed when your panel does not pass an absolute base
 URL to the plugin. It is used to build the QR image address.
 
-## 2. Sign in
+## 2. Authentication
 
-1. Open the panel's plugin / OAuth page and start the `豆包` sign-in entry.
-2. The panel opens a QR image served by the plugin at
-   `/v0/resource/plugins/omc-doubao-oauth/qr.png` (the latest active flow).
-3. Scan it with the Doubao mobile app and confirm on the phone.
-4. The plugin polls `check_qrconnect`, follows the final redirect, and writes an
-   auth file whose type is `doubao`.
+### Option A: Desktop Session Import (Recommended)
 
-If the panel cannot render the image URL, the login response metadata also
-contains `qr_base64` (PNG) and `qr_path`; a panel that understands metadata can
-render it directly.
+1. Open the panel's plugin / OAuth page and choose **豆包（桌面端导入）**.
+2. The plugin reads the local Windows desktop client session and writes an auth
+   credential immediately.
+3. No mobile scanning required, ensuring the imported account matches your
+   active desktop profile.
 
-### Session lifetime
+Headless server import is also supported:
 
-Doubao sessions are long-lived but not refreshable by the plugin. When the
-upstream returns 401/403, delete the auth file and sign in again. Do not reuse
-one account's cookies across machines.
-
-## 3. Upstream endpoints
-
-### `samantha` (default)
-
-```text
-POST https://www.doubao.com/samantha/chat/completion?aid=582478&...
-Content-Type: application/json
-Cookie: sessionid=...; ttwid=...; ...
+```bash
+python scripts/import_doubao_desktop.py --auth-dir "path/to/cpa/oauth"
 ```
 
-The body is the plain `messages` / `completion_option` object. This endpoint
-works with cookies and, when present, the `msToken` cookie. `deep_think` maps to
-`use_deep_think` and `use_auto_cot`.
+### Option B: Mobile QR Sign-In
 
-### `chat`
+1. Open the panel's plugin / OAuth page and select `豆包`.
+2. The panel renders a QR image served by the plugin at
+   `/v0/resource/plugins/omc-doubao-oauth/qr.png` (or base64 metadata).
+3. Scan it with the mobile app and confirm authorization.
+4. The plugin completes the session handshake and writes a `doubao` auth file.
 
-```text
-POST https://www.doubao.com/chat/completion?aid=582478&...
-```
+### Session Lifetime
 
-This is the desktop/CLI main entry. The body uses `client_meta` plus
-`content_block` messages, and carries the CSRF cookie in
-`x-tt-passport-csrf-token`. It normally requires ByteDance request signing
-(`a_bogus`), so pair it with `signer: external`.
+Sessions are long-lived. When upstream rejects credentials (HTTP 401),
+delete the auth file and sign in or import again.
 
-## 4. Signer service contract
+## 3. Upstream Channel Modes
 
-The plugin sends one JSON object per request:
+- **`samantha` (default, recommended)**: Lightweight direct channel operating
+  strictly with session credentials. Zero external signing dependencies.
+- **`chat`**: Secondary channel supporting request signature delegation via
+  `signer: external`.
+
+## 4. Signer Service Contract
+
+When `signer: external` is configured, the plugin forwards request context:
 
 ```json
 {
   "method": "POST",
-  "url": "https://www.doubao.com/chat/completion?aid=582478&...",
-  "headers": {"Cookie": ["sessionid=...; ttwid=..."]},
-  "body": "{\"client_meta\":{...}}"
+  "url": "https://...",
+  "headers": {"Cookie": ["..."]},
+  "body": "{...}"
 }
 ```
 
 It expects:
 
 ```json
-{"headers": {"X-Bogus": "...", "msToken": "..."}}
+{
+  "headers": {"Custom-Sign-Header": "..."}
+}
 ```
 
 Rules:
+- The service must answer within the host HTTP timeout.
+- `Host`, `Content-Length`, `Connection` and `Cookie` are managed by the plugin
+  and ignored from signer responses.
+- Keep the signer service bound to loopback (`127.0.0.1`).
 
-- The service must answer within the host HTTP timeout. A slow signer blocks the
-  request.
-- `Host`, `Content-Length`, `Connection` and `Cookie` are ignored by the plugin.
-- Return only the headers you want merged. Unknown headers are passed through
-  to Doubao, so keep the response minimal.
-
-### Browser-backed signer sketch
-
-The most reliable approach is a real page on `www.doubao.com` whose own fetch
-hook computes `a_bogus`. A Node/Playwright helper can expose exactly the
-contract above:
-
-```js
-// shape only: run a persistent browser context with a Doubao session
-import http from "node:http";
-import { chromium } from "playwright";
-
-const page = await (await chromium.launchPersistentContext("./profile")).newPage();
-await page.goto("https://www.doubao.com/chat/");
-
-http.createServer(async (req, res) => {
-  const input = JSON.parse(await new Promise(r => {
-    let b = ""; req.on("data", d => b += d); req.on("end", () => r(b));
-  }));
-  // Let the page's own signing hook run and capture the headers it adds.
-  const headers = await page.evaluate(async ({ url, body }) => {
-    const response = await fetch(url, { method: "POST", body, headers: { "Content-Type": "application/json" } });
-    return Object.fromEntries(response.headers); // replace with the captured request headers
-  }, input);
-  res.writeHead(200, { "Content-Type": "application/json" });
-  res.end(JSON.stringify({ headers }));
-}).listen(8787);
-```
-
-The sketch shows the shape, not a working signer: the hook must capture the
-outgoing request headers (for example by patching `window.fetch`) rather than
-the response headers. Keep the signer bound to `127.0.0.1` and never expose it
-to the network.
-
-## 5. Protocol mapping
+## 5. Protocol Mapping
 
 | Client | Request fields read | Response fields produced |
 | --- | --- | --- |
@@ -133,74 +92,34 @@ to the network.
 | Chat Completions | `messages[].content`, `reasoning_effort` | `chat.completion.chunk` with `content` and `reasoning_content` |
 | Responses | `instructions`, `input`, `reasoning.effort` | `response.output_text.delta`, `response.completed` |
 
-Token counts are estimates because Doubao's web endpoints do not return usage.
+Token counts are estimated where upstream streaming chunks do not supply usage totals.
 
-## 6. Quota card and reset cards
+## 6. Quota Card and Reset Cards
 
-The quota card uses Doubao's account endpoints:
+The plugin synchronizes subscription quotas and reset cards using authorized
+user sessions:
 
-- `POST /alice/commerce/sale/subscription/quota/summary/` with
-  `{"product_line":"membership"}` returns
-  `data.window_limit_section.window_limit_groups[].window_limits[]`. Each window
-  limit carries `start_time`, `end_time`, `used_amount`, `total_amount` and a
-  unit, which maps to the panel's `5h` / `7d` buckets and reset times.
-- `POST /alice/commerce/marketing/card/balance/` returns the reset-card stock
-  (`available_count_by_card_key.pc_quota_reset_card` / `quota_reset_card`).
-- `POST /alice/commerce/marketing/card/use/` consumes one card with
-  `{"card_key":"pc_quota_reset_card","use_request_id":"<uuid>"}`.
+- Displays active `7d` and `5h` rolling limit windows with current usage numbers
+  and reset timestamps.
+- Displays available quota reset-card inventory.
+- Provides a **Reset Quota** action to redeem a card and refresh quota immediately.
+- Falls back to local request-count estimation for free-tier accounts lacking
+  server-side subscription windows.
 
-These endpoints work with the session cookies only; the desktop/web client
-signs chat traffic with `a_bogus`, but the commerce endpoints do not require it.
-If the account has no subscription windows, the card is labeled as a local
-request-based estimate.
-
-## 7. Importing the desktop session
-
-QR sign-in can attach the wrong account if the phone app is signed in with a
-different profile than the desktop client. Use the panel's
-**豆包（桌面端导入）** entry, or run the Windows helper directly:
-
-```bash
-python scripts/import_doubao_desktop.py \
-  --auth-dir "D:/path/to/cpa/oauth" \
-  --user-data "C:/Users/<you>/AppData/Local/Doubao/User Data"
-```
-
-It reads the desktop `Cookies` store, decrypts the `v10` values with the
-DPAPI-protected key from `Local State`, backs up existing `doubao-*.json` files
-to `oauth-backup/`, and writes a fresh credential. Restart the CPA core
-afterwards. Requires `cryptography`.
-
-Verify the account with:
-
-```bash
-curl -s -X POST "http://127.0.0.1:8317/v0/management/quota/fetch" \
-  -H "Authorization: Bearer <secret>" -H "Content-Type: application/json" \
-  -d '{"auth_index":"<index>"}'
-```
-
-`subscription.plan` and the `7d` bucket should match the desktop account.
-
-## 8. Troubleshooting
+## 7. Troubleshooting
 
 | Symptom | Meaning | Action |
 | --- | --- | --- |
-| `401 reauth_required` | session expired or rejected | delete the auth file, sign in again |
-| `429 quota_exhausted` | account quota or rate limit | wait, or use another account |
-| `502 upstream_error` | Doubao rejected or broke the stream | check `endpoint`, retry, inspect CPA logs |
-| QR image 404 | flow expired (5 minutes) or plugin restarted | start the sign-in again |
-| `signer_error` | external signer unreachable or invalid JSON | check `signer_url`, run the signer locally |
-| empty answer | endpoint/format mismatch | try `endpoint: samantha` first |
+| `401 reauth_required` | Session expired or challenged | Delete the auth file, sign in or re-import |
+| `429 quota_exhausted` | Quota or rate limit hit | Wait for reset time, or redeem a reset card |
+| `502 upstream_error` | Upstream connection failure | Check network; prefer `endpoint: samantha` |
+| QR image 404 | Flow expired (5 minutes) or plugin restarted | Start the sign-in again |
+| `signer_error` | External signer unreachable or invalid JSON | Check `signer_url`, run signer locally |
+| Empty answer | Channel/format mismatch | Use `endpoint: samantha` |
 
-## 7. Security notes
+## 8. Security Notes
 
-- Auth files contain live `sessionid` cookies. Treat CPA's auth directory as a
-  secret store and restrict its permissions.
-- The plugin never logs request bodies or cookies.
-- The external signer receives URLs and bodies. Run it on the same machine and
-  keep it bound to loopback.
-
-
-
-
-
+- Auth files contain session cookies. Treat CPA's auth directory as a
+  secret store and restrict its filesystem permissions.
+- The plugin never logs sensitive request bodies or full cookie values.
+- Keep external signers bound to `127.0.0.1` and never expose them to public networks.
