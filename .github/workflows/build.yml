@@ -44,7 +44,7 @@ jobs:
           - { runner: ubuntu-24.04, goos: linux, goarch: amd64, ext: so }
           - { runner: ubuntu-24.04-arm, goos: linux, goarch: arm64, ext: so }
           - { runner: macos-15-intel, goos: darwin, goarch: amd64, ext: dylib }
-          - { runner: macos-14, goos: darwin, goarch: arm64, ext: dylib }
+          - { runner: macos-15-intel, goos: darwin, goarch: arm64, ext: dylib }
           - { runner: windows-latest, goos: windows, goarch: amd64, ext: dll }
     steps:
       - uses: actions/checkout@v4
@@ -60,7 +60,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          version="0.1.5"
+          version="0.1.6"
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             version="${GITHUB_REF_NAME#v}"
           fi
@@ -74,6 +74,12 @@ jobs:
           set -euo pipefail
           mkdir -p dist
           cd go
+          if [[ "${GOOS}" == "darwin" && "${GOARCH}" == "arm64" ]]; then
+            wrapper="${RUNNER_TEMP}/clang-arm64"
+            printf '#!/bin/sh\nexec clang -arch arm64 "$@"\n' > "$wrapper"
+            chmod +x "$wrapper"
+            export CC="$wrapper"
+          fi
           CGO_ENABLED=1 go build -trimpath -buildmode=c-shared \
             -ldflags "-s -w -X main.pluginVersion=${VERSION}" \
             -o "../dist/${PLUGIN_ID}.${{ matrix.ext }}" .
