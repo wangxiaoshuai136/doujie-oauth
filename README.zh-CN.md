@@ -44,7 +44,7 @@ Completions、OpenAI Responses 原生执行，以及标准化配额与重置卡�
 仍保留内部兼容，但不再显示为独立卡片。
 
 扫码不是必选项。桌面端入口无需手机；若豆包客户端正在运行并占用 Cookies 数据库，
-插件会自动打开免扫码导入页：从托盘完全退出豆包后，在页面上重试即可。
+插件会返回明确的提示：从托盘完全退出豆包后，重新点击该入口即可。
 
 国内和国际主入口会用系统默认 Chromium 浏览器打开独立登录窗口。你可以直接输入手机号、
 密码或短信验证码；插件只通过本机回环 DevTools 读取登录后的会话，不保存账号密码。
@@ -70,7 +70,7 @@ OAuth 发起和轮询使用 CPA 原生受认证管理 API，公共插件资源�
 
 - 豆姐国内版与 Dola 国际版两个独立扫码入口，默认国内版，从不自动换区。
 - Windows 桌面端会话导入，避免手机端与桌面端账号不一致。
-- 桌面 Cookies 被占用时提供免扫码重试页。
+- 桌面 Cookies 被占用时返回明确的退出客户端后重试提示。
 - 默认浏览器账号登录，支持手机号、密码或短信验证码，无需扫码。
 - 原生 Anthropic Messages、OpenAI Chat Completions、OpenAI Responses 执行。
 - 深度思考与思维链流式回传。
@@ -115,14 +115,16 @@ OAuth 发起和轮询使用 CPA 原生受认证管理 API，公共插件资源�
 ```
 
 当前为文生视频。插件会先调用 `/samantha/skill/pack` 获取账号实际可用的模型，
-校验请求模型后，通过官方“创意视频”技能入口提交：
+校验请求模型后，提交网页操作栏使用的顶层 `chat_ability` 对象：
 
-```text
-[创意视频](skill://doubao-creative-video?type=2&id=346073050)
+```json
+{
+  "ability_type": 17,
+  "ability_param": "{\"ratio\":\"16:9\",\"model\":\"seedance_v2.0_mini\",\"duration\":10,\"resolution\":\"720p\",\"input_box_content\":{\"user_input_content\":\"...\",\"reply_message_format\":\"生成视频：%s\"}}"
+}
 ```
 
-并在 `option.aggregate_params` 中设置 `mention_skill_list` / `mention_ext`，
-在 `ext` 中设置 `resourcemention=1`；不会静默切换到未请求的模型：
+`conversation_mode` 为 `1`，`mention_skill_list` / `mention_ext` 保持为空；不会静默切换到未请求的模型：
 
 | 请求模型 | 官方模型值 | 说明 |
 | --- | --- | --- |
@@ -172,11 +174,11 @@ plugins:
 | --- | --- | --- | --- |
 | `endpoint` | 枚举 | `samantha` | `samantha`、`chat` |
 | `signer` | 枚举 | `none` | `none`、`external` |
-| `signer_url` | 字符串 | 空 | `external` 时必填的绝对 HTTP(S) 地址 |
+| `signer_url` | 字符串 | 空 | `external` 时必填的 HTTPS 地址，或回环地址上的 HTTP |
 | `bot_id` | 字符串 | 国内默认 Bot | 留空或使用默认值时按入口选择站点 Bot |
 | `deep_think` | 布尔 | `false` | 是否强制所有请求开启深度思考 |
 | `max_concurrency` | 整数 | `3` | 每凭证 1–100 个并发请求 |
-| `public_base_url` | 字符串 | 空 | 面板未传基础地址时用于拼接二维码资源地址 |
+| `public_base_url` | 字符串 | 空 | 面板未传基础地址时用于拼接静态登录结果页地址 |
 | `app_version` | 字符串 | `2.1.7` | 国内客户端版本标识 |
 
 ## 开发

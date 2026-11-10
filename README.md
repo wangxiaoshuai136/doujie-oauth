@@ -49,8 +49,8 @@ import provider identifiers remain accepted internally for older clients, but
 they are no longer advertised as separate cards.
 
 QR scanning is optional. The desktop entry imports the local session without a
-phone. If Doubao is running and holds its cookie database open, the plugin opens
-a no-QR import page: quit Doubao from the tray, then retry on that page.
+phone. If Doubao is running and holds its cookie database open, the import fails
+with a clear message: quit Doubao from the tray, then retry the entry.
 
 The main domestic and Dola entries open the system default Chromium browser in an
 isolated profile. Sign in there with the phone number, password or SMS code you
@@ -84,7 +84,7 @@ The plugin needs no local callback listener and no separate browser process.
 - Separate domestic and Dola international QR entries; domestic by default, never
   auto-switching regions.
 - Windows desktop session import to avoid phone/desktop account mismatch.
-- No-QR fallback page for a locked desktop cookie database.
+- Clear retry guidance when the desktop cookie database is locked.
 - Default browser account sign-in for phone, password or SMS login without scanning.
 - Native Anthropic Messages, OpenAI Chat Completions and OpenAI Responses
   execution.
@@ -133,15 +133,17 @@ response.
 
 The current flow is text-to-video. The plugin calls `/samantha/skill/pack` to
 resolve the account's real model options, validates the requested model, and
-submits through the official Creative Video skill entry:
+submits the same top-level `chat_ability` object the web action bar uses:
 
-```text
-[创意视频](skill://doubao-creative-video?type=2&id=346073050)
+```json
+{
+  "ability_type": 17,
+  "ability_param": "{\"ratio\":\"16:9\",\"model\":\"seedance_v2.0_mini\",\"duration\":10,\"resolution\":\"720p\",\"input_box_content\":{\"user_input_content\":\"...\",\"reply_message_format\":\"生成视频：%s\"}}"
+}
 ```
 
-It also sets `mention_skill_list` / `mention_ext` in
-`option.aggregate_params` and `resourcemention=1` in `ext`. It never silently
-switches to an unrequested model:
+`conversation_mode` is `1`, and `mention_skill_list` / `mention_ext` stay empty.
+The plugin never silently switches to an unrequested model:
 
 | Requested model | Official value | Notes |
 | --- | --- | --- |
@@ -195,11 +197,11 @@ Releases are created by GitHub Actions whenever a `v*` tag is pushed.
 | --- | --- | --- | --- |
 | `endpoint` | enum | `samantha` | `samantha`, `chat` |
 | `signer` | enum | `none` | `none`, `external` |
-| `signer_url` | string | empty | Absolute HTTP(S) URL required by `external` |
+| `signer_url` | string | empty | HTTPS URL, or plain HTTP on loopback, required by `external` |
 | `bot_id` | string | Domestic default bot | Leave default to select the site bot by entry |
 | `deep_think` | boolean | `false` | Force deep thinking for every request |
 | `max_concurrency` | integer | `3` | 1–100 requests per credential |
-| `public_base_url` | string | empty | Fallback CPA URL for QR image rendering |
+| `public_base_url` | string | empty | Fallback CPA URL for static login result pages |
 | `app_version` | string | `2.1.7` | Domestic client version identifier |
 
 ## Development

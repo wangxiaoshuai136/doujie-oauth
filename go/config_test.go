@@ -29,4 +29,10 @@ func TestConfigureValidation(t *testing.T) {
 	if err := configure([]byte("signer: external\nsigner_url: http://127.0.0.1:8787/sign")); err != nil {
 		t.Fatalf("external signer should be accepted: %v", err)
 	}
+	if err := configure([]byte("signer: external\nsigner_url: http://signer.example.com/sign")); err == nil {
+		t.Fatal("remote plaintext signer must be rejected")
+	}
+	if err := configure([]byte("signer: external\nsigner_url: https://signer.example.com/sign")); err != nil {
+		t.Fatalf("remote HTTPS signer should be accepted: %v", err)
+	}
 }

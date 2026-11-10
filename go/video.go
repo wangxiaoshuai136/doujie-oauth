@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -17,10 +18,7 @@ import (
 const (
 	videoModelID      = "doubao-video"
 	videoAgentBotID   = "7338286299411103781"
-	videoAgentModelID = "9"
-	videoAgentModeID  = "3"
 	defaultVideoRatio = "16:9"
-	videoSkillMention = "[创意视频](skill://doubao-creative-video?type=2&id=346073050)"
 )
 
 var durationPattern = regexp.MustCompile(`(?i)(\d{1,2})\s*(秒|s|sec|seconds)`)
@@ -106,42 +104,48 @@ func videoModelLabel(model string) string {
 	}
 }
 
-func buildVideoPayload(prompt, ratio, duration, modelLabel, resolution, cameraMovement string) map[string]any {
-	parts := []string{"[已确认执行，请直接生成，不要再次询问参数。]"}
-	if strings.TrimSpace(modelLabel) != "" {
-		parts = append(parts, "请使用 "+strings.TrimSpace(modelLabel)+" 生成视频。")
+func buildVideoPayload(prompt, ratio, duration, modelValue, modelLabel, resolution string) map[string]any {
+	prompt = strings.TrimSpace(prompt)
+	ratio = strings.TrimSpace(ratio)
+	if ratio == "" {
+		ratio = "auto"
 	}
-	parts = append(parts, "画面比例："+strings.TrimSpace(ratio))
-	if strings.TrimSpace(duration) != "" {
-		parts = append(parts, "视频时长："+strings.TrimSpace(duration))
+	resolution = strings.TrimSpace(resolution)
+	if resolution == "" {
+		resolution = "720p"
 	}
-	if strings.TrimSpace(resolution) != "" {
-		parts = append(parts, "视频分辨率："+strings.TrimSpace(resolution))
+	seconds := 10
+	if value, err := strconv.Atoi(strings.TrimSpace(strings.TrimSuffix(duration, "s"))); err == nil {
+		seconds = value
+	} else if match := durationPattern.FindStringSubmatch(duration); len(match) > 1 {
+		if value, convErr := strconv.Atoi(match[1]); convErr == nil {
+			seconds = value
+		}
 	}
-	if strings.TrimSpace(cameraMovement) != "" {
-		parts = append(parts, "镜头运动："+strings.TrimSpace(cameraMovement))
+	if seconds < 4 || seconds > 15 {
+		seconds = 10
 	}
-	parts = append(parts, "画面描述："+strings.TrimSpace(prompt))
-	text := videoSkillMention + " " + strings.Join(parts, "\n")
+	if strings.TrimSpace(modelValue) == "" {
+		modelValue = fallbackVideoModelValues[canonicalVideoModel(modelLabel)]
+	}
+	if strings.TrimSpace(modelValue) == "" {
+		modelValue = "seedance_v2.0_mini"
+	}
+	text := fmt.Sprintf("生成视频：%s，%ds，%s", prompt, seconds, resolution)
+	abilityParam := string(mustJSON(map[string]any{
+		"ratio":      ratio,
+		"model":      modelValue,
+		"duration":   seconds,
+		"resolution": resolution,
+		"input_box_content": map[string]any{
+			"user_input_content":   prompt,
+			"reply_message_format": "生成视频：%s",
+		},
+	}))
 
 	messageID := randomUUID()
 	localConversationID := "local_" + strings.ReplaceAll(randomUUID(), "-", "")[:16]
 	now := time.Now()
-	generalTaskParam := map[string]any{
-		"action":                  0,
-		"thread_local_message_id": []string{messageID},
-		"project_id":              "",
-		"runtime_type":            1,
-		"agent_task_param": map[string]any{
-			"runtime_type":    1,
-			"folder_name":     "",
-			"device_name":     "",
-			"workspace":       "",
-			"local_app_id":    "",
-			"local_device_id": "",
-		},
-		"server_do_compare": true,
-	}
 	return map[string]any{
 		"client_meta": map[string]any{
 			"local_conversation_id": localConversationID,
@@ -182,9 +186,8 @@ func buildVideoPayload(prompt, ratio, duration, modelLabel, resolution, cameraMo
 			"collect_id":                "",
 			"is_audio":                  false,
 			"answer_with_suggest":       false,
-			"agent_mode":                1,
 			"tts_switch":                false,
-			"need_deep_think":           9,
+			"need_deep_think":           0,
 			"click_clear_context":       false,
 			"from_suggest":              false,
 			"is_regen":                  false,
@@ -199,8 +202,7 @@ func buildVideoPayload(prompt, ratio, duration, modelLabel, resolution, cameraMo
 			"unique_key":                randomUUID(),
 			"start_seq":                 0,
 			"need_create_conversation":  true,
-			"conversation_init_option":  map[string]any{"project_id": "", "need_ack_conversation": true},
-			"conversation_init_ext":     map[string]any{"agent_task_param": `{"runtime_type":1,"folder_name":"","device_name":"","workspace":"","local_app_id":"","local_device_id":""}`, "model_item_key": videoAgentModelID, "reasoning_effort": "5", "mode_id": videoAgentModeID},
+			"conversation_init_option":  map[string]any{"need_ack_conversation": true},
 			"regen_query_id":            []any{},
 			"edit_query_id":             []any{},
 			"regen_instruction":         "",
@@ -212,7 +214,7 @@ func buildVideoPayload(prompt, ratio, duration, modelLabel, resolution, cameraMo
 			"support_lazy_fetch_stream": true,
 			"is_ai_playground":          false,
 			"is_old_user":               true,
-			"general_task_param":        generalTaskParam,
+			"general_task_param":        map[string]any{"server_do_compare": true},
 			"recovery_option": map[string]any{
 				"is_recovery":            false,
 				"req_create_time_sec":    now.Unix(),
@@ -221,35 +223,33 @@ func buildVideoPayload(prompt, ratio, duration, modelLabel, resolution, cameraMo
 			"message_storage_type":        0,
 			"related_deleted_message_ids": map[string]any{},
 			"connector_info_list":         []any{},
-			"model_config": map[string]any{
-				"model_item_key":     videoAgentModelID,
-				"model_extra_params": map[string]any{"total_window_size": "256000"},
-				"reasoning_effort":   5,
-			},
+			"model_config":                map[string]any{"model_item_key": "", "model_extra_params": map[string]any{}},
 			"aggregate_params": map[string]any{
-				"mention_skill_list":  `["doubao-creative-video"]`,
+				"mention_skill_list":  "[]",
 				"mention_plugin_list": "[]",
-				"mention_ext":         `[{"skill":1}]`,
-				"conversation_mode":   "2",
-				"mode_id":             videoAgentModeID,
-				"model_item_key":      videoAgentModelID,
-				"agent_mode":          "1",
-				"reasoning_effort":    "5",
+				"mention_ext":         "[{}]",
+				"conversation_mode":   "1",
+				"mode_id":             "",
+				"model_item_key":      "",
+				"agent_mode":          "",
+				"reasoning_effort":    "",
 				"provider_id":         "",
 			},
-			"conversation_mode": 2,
+			"conversation_mode": 1,
+		},
+		"chat_ability": map[string]any{
+			"ability_type":  17,
+			"ability_param": abilityParam,
 		},
 		"user_context": []any{},
 		"ext": map[string]any{
-			"general_task_param":            string(mustJSON(generalTaskParam)),
-			"use_deep_think":                "9",
-			"agent_mode":                    "1",
-			"conversation_init_option":      `{"project_id":"","need_ack_conversation":true}`,
+			"answer_with_suggest":           "0",
 			"sub_conv_firstmet_type":        "1",
+			"general_task_param":            `{"server_do_compare":true}`,
 			"collection_id":                 "",
 			"is_finish":                     "1",
+			"conversation_init_option":      `{"need_ack_conversation":true}`,
 			"commerce_credit_config_enable": "0",
-			"resourcemention":               "1",
 		},
 	}
 }
@@ -716,8 +716,8 @@ func doVideoRequest(c credential, params url.Values, body []byte, sender httpSen
 	return resp, nil
 }
 
-func generateDoubaoAgentVideo(c credential, prompt, ratio, duration, model, modelLabel, resolution, cameraMovement string, sender httpSender) (doubaoVideoResult, error) {
-	payload := buildVideoPayload(prompt, ratio, duration, modelLabel, resolution, cameraMovement)
+func generateDoubaoAgentVideo(c credential, prompt, ratio, duration, modelValue, modelLabel, resolution string, sender httpSender) (doubaoVideoResult, error) {
+	payload := buildVideoPayload(prompt, ratio, duration, modelValue, modelLabel, resolution)
 	resp, err := doVideoRequest(c, videoAgentParams(c), mustJSON(payload), sender)
 	if err != nil {
 		return doubaoVideoResult{}, err
@@ -989,12 +989,11 @@ func runVideo(req pluginapi.ExecutorRequest, sender httpSender) (string, doubaoV
 		return "", doubaoVideoResult{}, pluginabi.NewError("invalid_request", err.Error(), http.StatusBadRequest)
 	}
 	resolution := videoResolutionFromPayload(req.Payload)
-	cameraMovement := videoCameraMovementFromPayload(req.Payload)
 	modelLabel := videoModelLabel(selection.ShowName)
 	if strings.TrimSpace(modelLabel) == "" {
 		modelLabel = videoModelLabel(model)
 	}
-	result, err := generateDoubaoAgentVideo(c, prompt, ratio, duration, model, modelLabel, resolution, cameraMovement, sender)
+	result, err := generateDoubaoAgentVideo(c, prompt, ratio, duration, selection.Value, modelLabel, resolution, sender)
 	if err != nil {
 		return "", doubaoVideoResult{}, err
 	}

@@ -140,8 +140,8 @@ func TestCollectVideoPlayInfo(t *testing.T) {
 	}
 }
 
-func TestBuildVideoPayloadUsesAgentMode(t *testing.T) {
-	payload := buildVideoPayload("a dog", "9:16", "5 秒", "Seedance 2.0", "", "")
+func TestBuildVideoPayloadUsesVideoAbility(t *testing.T) {
+	payload := buildVideoPayload("a dog", "9:16", "5 秒", "seedance_v2.0_std", "Seedance 2.0", "720p")
 	clientMeta := mapValue(payload["client_meta"])
 	if clientMeta["bot_id"] != videoAgentBotID {
 		t.Fatalf("bot_id = %v", clientMeta["bot_id"])
@@ -149,19 +149,27 @@ func TestBuildVideoPayloadUsesAgentMode(t *testing.T) {
 	message := mapValue(payload["messages"].([]any)[0])
 	block := mapValue(message["content_block"].([]any)[0])
 	text := fmtString(block, "content", "text_block", "text")
-	if !strings.Contains(text, "skill://doubao-creative-video") || !strings.Contains(text, "Seedance 2.0") || !strings.Contains(text, "9:16") || !strings.Contains(text, "a dog") {
-		t.Fatalf("agent prompt missing fields: %s", text)
+	if !strings.Contains(text, "生成视频：a dog，5s，720p") {
+		t.Fatalf("video prompt missing fields: %s", text)
 	}
 	option := mapValue(payload["option"])
-	if asInt(option["agent_mode"]) != 1 || option["conversation_mode"] != 2 {
-		t.Fatalf("unexpected agent option: %#v", option)
+	if asInt(option["conversation_mode"]) != 1 || asInt(option["need_deep_think"]) != 0 {
+		t.Fatalf("unexpected video option: %#v", option)
 	}
 	aggregate := mapValue(option["aggregate_params"])
-	if aggregate["mention_skill_list"] != `["doubao-creative-video"]` || aggregate["mention_ext"] != `[{"skill":1}]` {
-		t.Fatalf("video skill mention missing: %#v", aggregate)
+	if aggregate["mention_skill_list"] != "[]" || aggregate["mention_ext"] != "[{}]" || aggregate["conversation_mode"] != "1" {
+		t.Fatalf("unexpected aggregate params: %#v", aggregate)
 	}
-	if mapValue(payload["ext"])["resourcemention"] != "1" {
-		t.Fatalf("resourcemention missing")
+	ability := mapValue(payload["chat_ability"])
+	if asInt(ability["ability_type"]) != 17 {
+		t.Fatalf("chat_ability missing: %#v", ability)
+	}
+	var param map[string]any
+	if err := json.Unmarshal([]byte(ability["ability_param"].(string)), &param); err != nil {
+		t.Fatal(err)
+	}
+	if param["model"] != "seedance_v2.0_std" || param["ratio"] != "9:16" || asInt(param["duration"]) != 5 || param["resolution"] != "720p" {
+		t.Fatalf("unexpected ability_param: %#v", param)
 	}
 }
 
@@ -282,8 +290,11 @@ func TestExecuteVideoConfirmedOpenAIChat(t *testing.T) {
 		t.Fatalf("requests = %#v", sender.requests)
 	}
 	body := string(sender.requests[1].Body)
-	if !strings.Contains(body, "skill://doubao-creative-video") || !strings.Contains(body, "Seedance 2.0") || !strings.Contains(body, "已确认执行") {
-		t.Fatalf("submit body missing agent prompt: %s", body)
+	if !strings.Contains(body, `"chat_ability"`) || !strings.Contains(body, `"ability_type":17`) || !strings.Contains(body, "seedance_v2.0_std") || !strings.Contains(body, "生成视频：a running dog") {
+		t.Fatalf("submit body missing video ability: %s", body)
+	}
+	if strings.Contains(body, "skill://doubao-creative-video") {
+		t.Fatalf("submit body still uses the quota-limited creative video skill: %s", body)
 	}
 	if !strings.Contains(sender.requests[1].URL, "aid=497858") || !strings.Contains(sender.requests[1].URL, "web_platform=browser") {
 		t.Fatalf("agent URL missing updated params: %s", sender.requests[1].URL)

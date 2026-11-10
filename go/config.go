@@ -56,8 +56,8 @@ func configure(raw []byte) error {
 	}
 	c.SignerURL = strings.TrimSpace(c.SignerURL)
 	if c.Signer == "external" {
-		if _, ok := httpBaseURL(c.SignerURL); !ok {
-			return fmt.Errorf("invalid doubao plugin configuration: external signer requires an absolute HTTP(S) signer_url")
+		if !trustedSignerURL(c.SignerURL) {
+			return fmt.Errorf("invalid doubao plugin configuration: external signer requires HTTPS, or plain HTTP on loopback")
 		}
 	}
 	c.PublicBaseURL = strings.TrimSpace(c.PublicBaseURL)

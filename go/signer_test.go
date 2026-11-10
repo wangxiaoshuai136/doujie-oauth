@@ -12,16 +12,23 @@ import (
 type fakeSender struct {
 	response pluginapi.HTTPResponse
 	calls    int
+	lastReq  pluginapi.HTTPRequest
 }
 
 func (f *fakeSender) Do(req pluginapi.HTTPRequest) (pluginapi.HTTPResponse, error) {
 	f.calls++
+	f.lastReq = req
 	return f.response, nil
 }
 
 func TestExternalSignerMergesHeaders(t *testing.T) {
 	sender := &fakeSender{response: pluginapi.HTTPResponse{StatusCode: 200, Body: []byte(`{"headers":{"X-Bogus":"sig","Host":"evil","Cookie":"other"}}`)}}
-	req, err := externalSigner{url: "http://127.0.0.1:8787/sign"}.Sign(pluginapi.HTTPRequest{Method: http.MethodPost, URL: "https://www.doubao.com/x", Headers: http.Header{"Cookie": {"sessionid=s"}}}, sender)
+	req, err := externalSigner{url: "http://127.0.0.1:8787/sign"}.Sign(pluginapi.HTTPRequest{
+		Method:  http.MethodPost,
+		URL:     "https://www.doubao.com/x",
+		Headers: http.Header{"Cookie": {"sessionid=s"}, "Authorization": {"Bearer secret"}, "Content-Type": {"application/json"}},
+		Body:    []byte(`{"prompt":"private"}`),
+	}, sender)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,6 +40,32 @@ func TestExternalSignerMergesHeaders(t *testing.T) {
 	}
 	if req.Headers.Get("Host") == "evil" || req.Headers.Get("Cookie") != "sessionid=s" {
 		t.Fatalf("restricted headers must be preserved: %v", req.Headers)
+	}
+	if strings.Contains(string(sender.lastReq.Body), "sessionid") || strings.Contains(string(sender.lastReq.Body), "Bearer secret") {
+		t.Fatalf("signer payload leaked credentials: %s", sender.lastReq.Body)
+	}
+	var forwarded signRequest
+	if err = json.Unmarshal(sender.lastReq.Body, &forwarded); err != nil {
+		t.Fatal(err)
+	}
+	if forwarded.Headers["Cookie"] != nil || forwarded.Headers["Authorization"] != nil {
+		t.Fatalf("signer received restricted headers: %v", forwarded.Headers)
+	}
+	if forwarded.Headers["Content-Type"] == nil {
+		t.Fatalf("signer should receive non-sensitive target metadata: %v", forwarded.Headers)
+	}
+}
+
+func TestSignerRejectsUntrustedURL(t *testing.T) {
+	for _, raw := range []string{"http://signer.example.com/sign", "http://10.0.0.5/sign", "ftp://127.0.0.1/sign"} {
+		if _, err := (externalSigner{url: raw}).Sign(pluginapi.HTTPRequest{}, &fakeSender{}); err == nil {
+			t.Fatalf("untrusted signer URL accepted: %s", raw)
+		}
+	}
+	for _, raw := range []string{"https://signer.example.com/sign", "http://127.0.0.1:8787/sign", "http://localhost/sign", "http://[::1]:8787/sign"} {
+		if !trustedSignerURL(raw) {
+			t.Fatalf("trusted signer URL rejected: %s", raw)
+		}
 	}
 }
 

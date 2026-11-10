@@ -163,7 +163,40 @@ func TestStartLoginGlobalUsesDolaFlow(t *testing.T) {
 	if !strings.Contains(sender.requests[2].Headers.Get("Cookie"), "passport_csrf_token=csrf") {
 		t.Fatalf("CSRF cookie not forwarded: %q", sender.requests[2].Headers.Get("Cookie"))
 	}
-	if !strings.HasPrefix(resp.URL, "http://127.0.0.1:8317"+resourcePrefix+"/qr.png?flow=") {
+	if !strings.HasPrefix(resp.URL, "data:image/png;base64,") {
 		t.Fatalf("QR URL = %q", resp.URL)
+	}
+	if resp.Metadata["qr_base64"] == "" {
+		t.Fatal("QR metadata missing base64 payload")
+	}
+}
+
+func TestSafeLoginRedirect(t *testing.T) {
+	allowed := []string{
+		"https://www.doubao.com/passport/ok",
+		"https://passport.doubao.com/ok",
+		"https://www.dola.com/passport/ok",
+	}
+	for _, raw := range allowed {
+		site := siteCN
+		if strings.Contains(raw, "dola.com") {
+			site = siteGlobal
+		}
+		if _, ok := safeLoginRedirect(raw, site); !ok {
+			t.Fatalf("expected redirect to be allowed: %s", raw)
+		}
+	}
+	rejected := []string{
+		"http://www.doubao.com/passport/ok",
+		"https://evil.example.com/passport/ok",
+		"https://doubao.com.evil.example/passport/ok",
+		"https://www.doubao.com:8443/passport/ok",
+		"https://user:pass@www.doubao.com/passport/ok",
+		"https://www.dola.com/passport/ok",
+	}
+	for _, raw := range rejected {
+		if _, ok := safeLoginRedirect(raw, siteCN); ok {
+			t.Fatalf("expected redirect to be rejected: %s", raw)
+		}
 	}
 }

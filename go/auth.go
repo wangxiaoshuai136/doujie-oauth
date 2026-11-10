@@ -28,16 +28,13 @@ const (
 )
 
 type loginFlow struct {
-	Site        string
-	Token       string
-	CSRF        string
-	Cookies     map[string]string
-	Expires     time.Time
-	QRPNG       []byte
-	ImportToken string
-	QRToken     string
-	Browser     *browserLogin
-	Imported    *pluginapi.AuthData
+	Site     string
+	Token    string
+	CSRF     string
+	Cookies  map[string]string
+	Expires  time.Time
+	Browser  *browserLogin
+	Imported *pluginapi.AuthData
 }
 
 var flowMu sync.Mutex
@@ -63,23 +60,6 @@ func takeFlow(id string) *loginFlow {
 	return flow
 }
 
-func newestFlow() *loginFlow {
-	flowMu.Lock()
-	defer flowMu.Unlock()
-	var newest *loginFlow
-	var newestAt time.Time
-	for _, flow := range flowStore {
-		if flow == nil || flow.Expires.Before(time.Now()) || len(flow.QRPNG) == 0 {
-			continue
-		}
-		if newest == nil || flow.Expires.After(newestAt) {
-			newest = flow
-			newestAt = flow.Expires
-		}
-	}
-	return newest
-}
-
 func peekFlow(id string) *loginFlow {
 	flowMu.Lock()
 	defer flowMu.Unlock()
@@ -89,51 +69,6 @@ func peekFlow(id string) *loginFlow {
 		return nil
 	}
 	return flow
-}
-
-func manualImportFlow(token string) *loginFlow {
-	flowMu.Lock()
-	defer flowMu.Unlock()
-	now := time.Now()
-	for id, flow := range flowStore {
-		if flow == nil || flow.Expires.Before(now) {
-			delete(flowStore, id)
-			continue
-		}
-		if token != "" && flow.ImportToken == token {
-			return flow
-		}
-	}
-	return nil
-}
-
-func qrFlowByToken(token string) *loginFlow {
-	flowMu.Lock()
-	defer flowMu.Unlock()
-	now := time.Now()
-	for _, flow := range flowStore {
-		if flow == nil || flow.Expires.Before(now) {
-			continue
-		}
-		if token != "" && flow.QRToken == token && len(flow.QRPNG) > 0 {
-			return flow
-		}
-	}
-	return nil
-}
-
-func completeManualImport(token string, auth pluginapi.AuthData) bool {
-	flowMu.Lock()
-	defer flowMu.Unlock()
-	for _, flow := range flowStore {
-		if flow == nil || flow.Expires.Before(time.Now()) || token == "" || flow.ImportToken != token {
-			continue
-		}
-		copy := auth
-		flow.Imported = &copy
-		return true
-	}
-	return false
 }
 
 const (
@@ -204,7 +139,6 @@ func httpGet(sender httpSender, target string, headers http.Header, jar map[stri
 
 func startLogin(req pluginapi.AuthLoginStartRequest, sender httpSender) (pluginapi.AuthLoginStartResponse, error) {
 	var out pluginapi.AuthLoginStartResponse
-	cfg := getConfig()
 	if req.Host.AuthDir == "" {
 		return out, errors.New("CPA auth directory unavailable")
 	}
@@ -278,25 +212,19 @@ func startLogin(req pluginapi.AuthLoginStartRequest, sender httpSender) (plugina
 		return out, errors.New("cannot generate login state")
 	}
 	expires := time.Now().Add(flowsTTL)
-	qrToken, err := randomHex(16)
-	if err != nil {
-		return out, errors.New("cannot generate login QR token")
-	}
-	putFlow(flowID, &loginFlow{Site: site, Token: qrEnvelope.Data.Token, CSRF: csrf, Cookies: jar, Expires: expires, QRPNG: png, QRToken: qrToken})
+	putFlow(flowID, &loginFlow{Site: site, Token: qrEnvelope.Data.Token, CSRF: csrf, Cookies: jar, Expires: expires})
 	state, err := sealState(key, flowID, expires)
 	if err != nil {
 		return out, err
 	}
-	base := absoluteBase(cfg.PublicBaseURL, req.BaseURL)
-	qrPath := resourcePrefix + "/qr.png?flow=" + url.QueryEscape(qrToken)
+	qrDataURL := "data:image/png;base64," + base64.StdEncoding.EncodeToString(png)
 	out = pluginapi.AuthLoginStartResponse{
 		Provider:  credentialProvider,
-		URL:       base + qrPath,
+		URL:       qrDataURL,
 		State:     state,
 		ExpiresAt: expires.UTC(),
 		Metadata: map[string]any{
 			"site":        site,
-			"qr_path":     qrPath,
 			"qr_base64":   base64.StdEncoding.EncodeToString(png),
 			"qr_mime":     "image/png",
 			"poll_hint":   "scan with the mobile app",
@@ -322,6 +250,27 @@ func absoluteBase(publicBase, hostBase string) string {
 		return strings.TrimSuffix(u.String(), "/")
 	}
 	return ""
+}
+
+// safeLoginRedirect only follows HTTPS redirects on the Doubao-owned domain for
+// the active site. Flow cookies are never sent to an upstream-supplied origin.
+func safeLoginRedirect(raw, site string) (string, bool) {
+	u, ok := httpBaseURL(raw)
+	if !ok || u.Scheme != "https" || u.User != nil {
+		return "", false
+	}
+	if port := u.Port(); port != "" && port != "443" {
+		return "", false
+	}
+	host := strings.ToLower(strings.TrimSuffix(u.Hostname(), "."))
+	suffix := "doubao.com"
+	if normalizeSite(site) == siteGlobal {
+		suffix = "dola.com"
+	}
+	if host != suffix && !strings.HasSuffix(host, "."+suffix) {
+		return "", false
+	}
+	return u.String(), true
 }
 
 func decodeQRCode(raw string) ([]byte, error) {
@@ -393,10 +342,6 @@ func pollLogin(req pluginapi.AuthLoginPollRequest, sender httpSender) (pluginapi
 		pending.Message = "请在浏览器中完成账号登录"
 		return pending, nil
 	}
-	if flow.ImportToken != "" {
-		pending.Message = "等待手动导入登录态"
-		return pending, nil
-	}
 	profile := profileForSite(flow.Site)
 	next := url.QueryEscape(profile.Root)
 	target := profile.Root + "/passport/web/check_qrconnect/?next=" + next + "&token=" + url.QueryEscape(flow.Token) + "&aid=" + profile.PassportAID
@@ -440,7 +385,9 @@ func pollLogin(req pluginapi.AuthLoginPollRequest, sender httpSender) (pluginapi
 		return pluginapi.AuthLoginPollResponse{Status: pluginapi.AuthLoginStatusError, Message: "二维码已过期，请重新开始"}, nil
 	case "confirmed":
 		if envelope.Data.RedirectURL != "" {
-			_, _ = httpGet(sender, envelope.Data.RedirectURL, browserHeaders(nil), flow.Cookies)
+			if target, ok := safeLoginRedirect(envelope.Data.RedirectURL, flow.Site); ok {
+				_, _ = httpGet(sender, target, browserHeaders(nil), flow.Cookies)
+			}
 		}
 		if strings.TrimSpace(flow.Cookies["sessionid"]) == "" {
 			return pluginapi.AuthLoginPollResponse{Status: pluginapi.AuthLoginStatusError, Message: "登录已确认，但未取到会话凭据"}, nil
@@ -605,21 +552,15 @@ func startDesktopImport(req pluginapi.AuthLoginStartRequest, sender httpSender, 
 		if err != nil {
 			return out, err
 		}
+	} else {
+		return out, errors.New("桌面端 Cookies 正在被占用，请从任务栏托盘完全退出豆包后重试")
 	}
 	flowID, err := randomHex(16)
 	if err != nil {
 		return out, errors.New("cannot generate login state")
 	}
 	expires := time.Now().Add(flowsTTL)
-	flow := &loginFlow{Site: siteCN, Expires: expires}
-	if authData.Provider != "" {
-		flow.Imported = &authData
-	} else {
-		flow.ImportToken, err = randomHex(16)
-		if err != nil {
-			return out, errors.New("cannot generate import token")
-		}
-	}
+	flow := &loginFlow{Site: siteCN, Expires: expires, Imported: &authData}
 	putFlow(flowID, flow)
 	state, err := sealState(key, flowID, expires)
 	if err != nil {
@@ -629,13 +570,7 @@ func startDesktopImport(req pluginapi.AuthLoginStartRequest, sender httpSender, 
 	base := absoluteBase(cfg.PublicBaseURL, req.BaseURL)
 	resourceURL := base + resourcePrefix + "/imported.html"
 	metadata := map[string]any{"source": "desktop-import"}
-	if flow.Imported != nil {
-		metadata["label"] = authData.Label
-	} else {
-		resourceURL = base + resourcePrefix + "/manual.html?token=" + url.QueryEscape(flow.ImportToken)
-		metadata["source"] = "manual-import"
-		metadata["message"] = "桌面端 Cookies 正在被占用，请在打开的页面中完成免扫码导入"
-	}
+	metadata["label"] = authData.Label
 	out = pluginapi.AuthLoginStartResponse{
 		Provider:  credentialProvider,
 		URL:       resourceURL,

@@ -33,12 +33,9 @@ CPA's OAuth callback URL.
    active desktop profile.
 
 Doubao keeps its cookie database open while running. If the session is locked,
-the plugin opens a no-QR import page instead of failing:
-
-1. Quit Doubao completely from the notification-area tray.
-2. Reopen the import page and click **重新读取桌面端**.
-
-The import link expires with the normal five-minute login flow.
+the import fails with a clear message: quit Doubao completely from the
+notification-area tray, then start the same entry again. No unauthenticated
+retry page is exposed.
 
 Headless server import is also supported:
 
@@ -87,7 +84,7 @@ When `signer: external` is configured, the plugin forwards request context:
 {
   "method": "POST",
   "url": "https://...",
-  "headers": {"Cookie": ["..."]},
+  "headers": {"Content-Type": ["application/json"], "Accept": ["*/*"]},
   "body": "{...}"
 }
 ```
@@ -102,9 +99,13 @@ It expects:
 
 Rules:
 - The service must answer within the host HTTP timeout.
+- Session cookies, authorization headers and CSRF tokens are never sent to the
+  signer. Only `Content-Type`, `Accept`, `User-Agent` and `Agw-Js-Conv` are
+  forwarded.
+- `signer_url` must use HTTPS, or plain HTTP only when the host is loopback
+  (`127.0.0.1`, `::1`, `localhost`).
 - `Host`, `Content-Length`, `Connection` and `Cookie` are managed by the plugin
   and ignored from signer responses.
-- Keep the signer service bound to loopback (`127.0.0.1`).
 
 ## 5. Protocol Mapping
 
@@ -124,11 +125,10 @@ request. The first request returns a short plan; send `"confirm": true` (or a
 follow-up user message such as `确认生成`) to submit exactly one video task. The
 final MP4 URL is returned in the assistant message.
 
-Video generation uses the official Creative Video skill and web-session quota.
-The plugin resolves the account's real model options from
-`/samantha/skill/pack`, validates the requested model, and submits the
-`[创意视频](skill://doubao-creative-video?type=2&id=346073050)` mention with
-`mention_skill_list` / `mention_ext` / `resourcemention`. `Seedance 2.0`
+Video generation uses the same top-level `chat_ability` object as the web
+action bar (`ability_type: 17`). The plugin resolves the account's real model
+options from `/samantha/skill/pack`, validates the requested model, and submits
+`conversation_mode: 1` with an empty `mention_skill_list`. `Seedance 2.0`
 (`seedance_v2.0_std`) requires an enhanced subscription; use Fast or Mini if the
 account does not have it. `query_video_gen_info.remain_count` is not the video
 quota; the server still checks subscription and the 7-day video quota. It is
@@ -163,7 +163,6 @@ reported as returned by the server; the script does not fabricate a client login
 | `401 reauth_required` | Session expired or challenged | Delete the auth file, sign in or re-import |
 | `429 quota_exhausted` | Quota or rate limit hit | Wait for reset time, or redeem a reset card |
 | `502 upstream_error` | Upstream connection failure | Check network; prefer `endpoint: samantha` |
-| QR image 404 | Flow expired (5 minutes) or plugin restarted | Start the sign-in again |
 | `signer_error` | External signer unreachable or invalid JSON | Check `signer_url`, run signer locally |
 | Empty answer | Channel/format mismatch | Use `endpoint: samantha` |
 
@@ -172,4 +171,4 @@ reported as returned by the server; the script does not fabricate a client login
 - Auth files contain session cookies. Treat CPA's auth directory as a
   secret store and restrict its filesystem permissions.
 - The plugin never logs sensitive request bodies or full cookie values.
-- Keep external signers bound to `127.0.0.1` and never expose them to public networks.
+- Prefer a signer bound to `127.0.0.1`; remote signers must use HTTPS.

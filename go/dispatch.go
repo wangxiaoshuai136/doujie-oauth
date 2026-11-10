@@ -8,7 +8,7 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
 )
 
-var pluginVersion = "0.1.9"
+var pluginVersion = "0.2.0"
 
 type rpcAuthStart struct {
 	pluginapi.AuthLoginStartRequest
@@ -66,7 +66,7 @@ func registration() any {
 				{Name: "deep_think", Type: pluginapi.ConfigFieldTypeBoolean, Description: "Request Doubao deep thinking for every call (default false; thinking models enable it automatically)."},
 				{Name: "signer", Type: pluginapi.ConfigFieldTypeEnum, EnumValues: []string{"none", "external"}, Description: "Request signing mode: direct HTTP (none) or an external signing service (external)."},
 				{Name: "signer_url", Type: pluginapi.ConfigFieldTypeString, Description: "Absolute HTTP(S) URL of the external signer; required when signer is external."},
-				{Name: "public_base_url", Type: pluginapi.ConfigFieldTypeString, Description: "Optional absolute CPA base URL used to render the login QR image when the panel does not supply one."},
+				{Name: "public_base_url", Type: pluginapi.ConfigFieldTypeString, Description: "Optional absolute CPA base URL used for the static login result pages."},
 				{Name: "endpoint", Type: pluginapi.ConfigFieldTypeEnum, EnumValues: []string{"samantha", "chat"}, Description: "Upstream endpoint family: samantha (default, direct HTTP) or chat (desktop completion, usually needs an external signer)."},
 				{Name: "app_version", Type: pluginapi.ConfigFieldTypeString, Description: "Doubao desktop client version sent in request parameters (default 2.1.7)."},
 			},
@@ -143,9 +143,7 @@ func handleMethod(method string, raw []byte) (any, error) {
 	case "management.register":
 		return map[string]any{"resources": []map[string]any{
 			{"path": "/logo.png", "menu": "", "description": "Plugin logo."},
-			{"path": "/qr.png", "menu": "", "description": "Login QR code for the latest sign-in flow."},
 			{"path": "/imported.html", "menu": "", "description": "Desktop import result page."},
-			{"path": "/manual.html", "menu": "", "description": "No-QR desktop import retry page."},
 			{"path": "/account.html", "menu": "", "description": "Browser-based account sign-in page."},
 			{"path": "/doubao.png", "menu": "", "description": "Domestic sign-in logo."},
 			{"path": "/dola.png", "menu": "", "description": "International sign-in logo."},
