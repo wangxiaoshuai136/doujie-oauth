@@ -114,8 +114,27 @@ OAuth 发起和轮询使用 CPA 原生受认证管理 API，公共插件资源�
 }
 ```
 
-当前为文生视频；`seedance-*` 选择通过提示词交给豆包 agent，时长和分辨率由账号当前
-可用能力决定。
+当前为文生视频。插件会先调用 `/samantha/skill/pack` 获取账号实际可用的模型，
+校验请求模型后，通过官方“创意视频”技能入口提交：
+
+```text
+[创意视频](skill://doubao-creative-video?type=2&id=346073050)
+```
+
+并在 `option.aggregate_params` 中设置 `mention_skill_list` / `mention_ext`，
+在 `ext` 中设置 `resourcemention=1`；不会静默切换到未请求的模型：
+
+| 请求模型 | 官方模型值 | 说明 |
+| --- | --- | --- |
+| `doubao-video` | 账号默认模型 | 当前通常是 `seedance_v2.0_mini` |
+| `seedance-2.0` | `seedance_v2.0_std` | 需要增强订阅；未开通会返回上游错误 |
+| `seedance-2.0-fast` | `seedance_v2.0` | 通常无需增强订阅 |
+| `seedance-2.0-mini` | `seedance_v2.0_mini` | 默认、通常无需增强订阅 |
+| `seedance-2.5` | 服务端下发 | 仅当账号的实际 SkillPack 提供时可用 |
+
+如果账号未开通 `Seedance 2.0`，请改用 Fast 或 Mini；这不是插件版本问题。
+`query_video_gen_info.remain_count` 是聚合体验次数，不等于视频生成额度；最终是否
+能生成仍由豆包服务端校验订阅和 7 天视频额度。
 
 ### 独立视频 Skill
 

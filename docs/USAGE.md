@@ -124,7 +124,14 @@ request. The first request returns a short plan; send `"confirm": true` (or a
 follow-up user message such as `确认生成`) to submit exactly one video task. The
 final MP4 URL is returned in the assistant message.
 
-Video generation uses the signed-in Doubao agent and web-session quota. It is
+Video generation uses the official Creative Video skill and web-session quota.
+The plugin resolves the account's real model options from
+`/samantha/skill/pack`, validates the requested model, and submits the
+`[创意视频](skill://doubao-creative-video?type=2&id=346073050)` mention with
+`mention_skill_list` / `mention_ext` / `resourcemention`. `Seedance 2.0`
+(`seedance_v2.0_std`) requires an enhanced subscription; use Fast or Mini if the
+account does not have it. `query_video_gen_info.remain_count` is not the video
+quota; the server still checks subscription and the 7-day video quota. It is
 currently text-to-video only.
 
 ## 6. Quota Card and Reset Cards

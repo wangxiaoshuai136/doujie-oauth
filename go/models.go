@@ -28,16 +28,16 @@ var doubaoModels = []modelSpec{
 	{
 		ID:          "doubao-video",
 		Display:     "豆姐视频（自动）",
-		Description: "Generate a video through the signed-in Doubao agent; the agent selects the available model.",
+		Description: "Generate a video through the official Doubao video skill; uses the account default model (currently Seedance 2.0 Mini).",
 		Context:     8192,
 		Output:      2048,
 		Version:     "auto",
 		Outputs:     []string{"text", "video"},
 	},
-	{ID: "seedance-2.5", Display: "Seedance 2.5", Description: "Use Seedance 2.5 through the Doubao video agent.", Context: 8192, Output: 2048, Version: "2.5", Outputs: []string{"text", "video"}},
-	{ID: "seedance-2.0", Display: "Seedance 2.0", Description: "Use Seedance 2.0 through the Doubao video agent.", Context: 8192, Output: 2048, Version: "2.0", Outputs: []string{"text", "video"}},
-	{ID: "seedance-2.0-fast", Display: "Seedance 2.0 Fast", Description: "Use Seedance 2.0 Fast through the Doubao video agent.", Context: 8192, Output: 2048, Version: "2.0-fast", Outputs: []string{"text", "video"}},
-	{ID: "seedance-2.0-mini", Display: "Seedance 2.0 Mini", Description: "Use Seedance 2.0 Mini through the Doubao video agent.", Context: 8192, Output: 2048, Version: "2.0-mini", Outputs: []string{"text", "video"}},
+	{ID: "seedance-2.5", Display: "Seedance 2.5", Description: "Use Seedance 2.5 when the account's official video skill exposes it.", Context: 8192, Output: 2048, Version: "2.5", Outputs: []string{"text", "video"}},
+	{ID: "seedance-2.0", Display: "Seedance 2.0", Description: "Official Seedance 2.0; requires an enhanced Doubao subscription. Use Fast or Mini if unavailable.", Context: 8192, Output: 2048, Version: "2.0", Outputs: []string{"text", "video"}},
+	{ID: "seedance-2.0-fast", Display: "Seedance 2.0 Fast", Description: "Use Seedance 2.0 Fast through the official Doubao video skill.", Context: 8192, Output: 2048, Version: "2.0-fast", Outputs: []string{"text", "video"}},
+	{ID: "seedance-2.0-mini", Display: "Seedance 2.0 Mini", Description: "Use Seedance 2.0 Mini through the official Doubao video skill.", Context: 8192, Output: 2048, Version: "2.0-mini", Outputs: []string{"text", "video"}},
 }
 
 func staticModels() []pluginapi.ModelInfo {
@@ -67,7 +67,7 @@ func staticModels() []pluginapi.ModelInfo {
 			SupportedGenerationMethods: []string{"chat"},
 			SupportedInputModalities:   []string{"text"},
 			SupportedOutputModalities:  spec.Outputs,
-			SupportedParameters:        []string{"prompt", "ratio"},
+			SupportedParameters:        []string{"prompt", "ratio", "seconds", "resolution"},
 			Thinking:                   thinking,
 		})
 	}

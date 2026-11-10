@@ -28,7 +28,7 @@ var siteProfiles = map[string]siteProfile{
 		PassportAID:  "497858",
 		ChatAID:      "582478",
 		DefaultBotID: defaultBotID,
-		WebVersion:   "3.44.8",
+		WebVersion:   "3.45.1",
 		Language:     "zh",
 		Region:       "CN",
 		SysRegion:    "CN",

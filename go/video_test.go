@@ -77,6 +77,13 @@ func agentVideoEvent(taskID string, videoURL string, coverURL string) map[string
 	}
 }
 
+func videoSkillPackResponse() pluginapi.HTTPResponse {
+	return pluginapi.HTTPResponse{
+		StatusCode: http.StatusOK,
+		Body:       []byte(`{"code":0,"data":{"video_generation":{"meta":{"option_list":[{"value":"model","options":[{"show_name":"Seedance 2.0","value":"seedance_v2.0_std","is_default":false,"subscription_tag":"enhanced"},{"show_name":"Seedance 2.0 Fast","value":"seedance_v2.0","is_default":false},{"show_name":"Seedance 2.0 Mini","value":"seedance_v2.0_mini","is_default":true}]}]}}}}`),
+	}
+}
+
 func TestVideoModelSelection(t *testing.T) {
 	for _, model := range []string{"doubao-video", "seedance-2.5", "seedance-2.0", "seedance-2.0-fast", "seedance-2.0-mini", "seedance-future-model"} {
 		if !isVideoModel(model) {
@@ -91,8 +98,50 @@ func TestVideoModelSelection(t *testing.T) {
 	}
 }
 
+func TestResolveVideoModelUsesOfficialSkillPack(t *testing.T) {
+	pack := videoSkillPack{
+		Models: []videoModelOption{
+			{Value: "seedance_v2.0_std", ShowName: "Seedance 2.0", SubscriptionTag: "enhanced"},
+			{Value: "seedance_v2.0", ShowName: "Seedance 2.0 Fast"},
+			{Value: "seedance_v2.0_mini", ShowName: "Seedance 2.0 Mini", Default: true},
+		},
+		DefaultModel: videoModelOption{Value: "seedance_v2.0_mini", ShowName: "Seedance 2.0 Mini", Default: true},
+	}
+	for requested, want := range map[string]string{
+		"doubao-video":      "seedance_v2.0_mini",
+		"seedance-2.0":      "seedance_v2.0_std",
+		"seedance-2.0-fast": "seedance_v2.0",
+		"seedance-2.0-mini": "seedance_v2.0_mini",
+	} {
+		option, err := resolveVideoModel(pack, requested)
+		if err != nil || option.Value != want {
+			t.Fatalf("resolve %s = %#v, %v; want %s", requested, option, err, want)
+		}
+	}
+	if _, err := resolveVideoModel(pack, "seedance-2.5"); err == nil || !strings.Contains(err.Error(), "Seedance 2.5") {
+		t.Fatalf("unavailable 2.5 should fail clearly: %v", err)
+	}
+}
+
+func TestCollectVideoPlayInfo(t *testing.T) {
+	root := map[string]any{
+		"data": map[string]any{
+			"play_info": map[string]any{
+				"main":   "https://cdn.example/play.mp4",
+				"width":  float64(1280),
+				"height": float64(720),
+			},
+		},
+	}
+	videos := []generatedVideo{}
+	collectVideoPlayInfo(root, &videos, map[string]struct{}{})
+	if len(videos) != 1 || videos[0].URL != "https://cdn.example/play.mp4" || videos[0].Width != 1280 {
+		t.Fatalf("play info = %#v", videos)
+	}
+}
+
 func TestBuildVideoPayloadUsesAgentMode(t *testing.T) {
-	payload := buildVideoPayload("a dog", "9:16", "5 秒", "seedance-2.0")
+	payload := buildVideoPayload("a dog", "9:16", "5 秒", "Seedance 2.0", "", "")
 	clientMeta := mapValue(payload["client_meta"])
 	if clientMeta["bot_id"] != videoAgentBotID {
 		t.Fatalf("bot_id = %v", clientMeta["bot_id"])
@@ -100,12 +149,19 @@ func TestBuildVideoPayloadUsesAgentMode(t *testing.T) {
 	message := mapValue(payload["messages"].([]any)[0])
 	block := mapValue(message["content_block"].([]any)[0])
 	text := fmtString(block, "content", "text_block", "text")
-	if !strings.Contains(text, "Seedance 2.0") || !strings.Contains(text, "9:16") || !strings.Contains(text, "a dog") {
+	if !strings.Contains(text, "skill://doubao-creative-video") || !strings.Contains(text, "Seedance 2.0") || !strings.Contains(text, "9:16") || !strings.Contains(text, "a dog") {
 		t.Fatalf("agent prompt missing fields: %s", text)
 	}
 	option := mapValue(payload["option"])
 	if asInt(option["agent_mode"]) != 1 || option["conversation_mode"] != 2 {
 		t.Fatalf("unexpected agent option: %#v", option)
+	}
+	aggregate := mapValue(option["aggregate_params"])
+	if aggregate["mention_skill_list"] != `["doubao-creative-video"]` || aggregate["mention_ext"] != `[{"skill":1}]` {
+		t.Fatalf("video skill mention missing: %#v", aggregate)
+	}
+	if mapValue(payload["ext"])["resourcemention"] != "1" {
+		t.Fatalf("resourcemention missing")
 	}
 }
 
@@ -201,10 +257,14 @@ func TestExecuteVideoConfirmedOpenAIChat(t *testing.T) {
 	if err := configure(nil); err != nil {
 		t.Fatal(err)
 	}
-	sender := &sequenceSender{responses: []pluginapi.HTTPResponse{{
-		StatusCode: http.StatusOK,
-		Body:       agentSSE(agentVideoEvent("task_1", "https://cdn.example/final.mp4", "https://cdn.example/cover.jpg")),
-	}}}
+	sender := &sequenceSender{responses: []pluginapi.HTTPResponse{
+		videoSkillPackResponse(),
+		{
+			StatusCode: http.StatusOK,
+			Body:       agentSSE(agentVideoEvent("task_1", "https://cdn.example/final.mp4", "https://cdn.example/cover.jpg")),
+		},
+		{StatusCode: http.StatusOK, Body: []byte(`{"code":0,"data":{"remain_count":9,"has_generating_task":false}}`)},
+	}}
 	req := pluginapi.ExecutorRequest{
 		Model:       "seedance-2.0",
 		Format:      "openai",
@@ -218,15 +278,15 @@ func TestExecuteVideoConfirmedOpenAIChat(t *testing.T) {
 	if !strings.Contains(string(resp.Payload), "https://cdn.example/final.mp4") {
 		t.Fatalf("payload lost video URL: %s", resp.Payload)
 	}
-	if len(sender.requests) != 1 || !strings.Contains(sender.requests[0].URL, "/chat/completion") {
+	if len(sender.requests) != 3 || !strings.Contains(sender.requests[0].URL, "/samantha/skill/pack") || !strings.Contains(sender.requests[1].URL, "/chat/completion") {
 		t.Fatalf("requests = %#v", sender.requests)
 	}
-	body := string(sender.requests[0].Body)
-	if !strings.Contains(body, "Seedance 2.0") || !strings.Contains(body, "已确认执行") {
+	body := string(sender.requests[1].Body)
+	if !strings.Contains(body, "skill://doubao-creative-video") || !strings.Contains(body, "Seedance 2.0") || !strings.Contains(body, "已确认执行") {
 		t.Fatalf("submit body missing agent prompt: %s", body)
 	}
-	if !strings.Contains(sender.requests[0].URL, "aid=497858") || !strings.Contains(sender.requests[0].URL, "web_platform=browser") {
-		t.Fatalf("agent URL missing updated params: %s", sender.requests[0].URL)
+	if !strings.Contains(sender.requests[1].URL, "aid=497858") || !strings.Contains(sender.requests[1].URL, "web_platform=browser") {
+		t.Fatalf("agent URL missing updated params: %s", sender.requests[1].URL)
 	}
 }
 

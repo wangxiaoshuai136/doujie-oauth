@@ -20,6 +20,7 @@ const (
 	videoAgentModelID = "9"
 	videoAgentModeID  = "3"
 	defaultVideoRatio = "16:9"
+	videoSkillMention = "[创意视频](skill://doubao-creative-video?type=2&id=346073050)"
 )
 
 var durationPattern = regexp.MustCompile(`(?i)(\d{1,2})\s*(秒|s|sec|seconds)`)
@@ -33,10 +34,32 @@ type generatedVideo struct {
 }
 
 type doubaoVideoResult struct {
-	TaskID string
-	Videos []generatedVideo
-	Text   string
-	Plan   bool
+	TaskID     string
+	Vid        string
+	Model      string
+	ModelValue string
+	Remain     int
+	Videos     []generatedVideo
+	Text       string
+	Plan       bool
+}
+
+type videoModelOption struct {
+	Value           string `json:"value"`
+	ShowName        string `json:"show_name"`
+	Default         bool   `json:"is_default"`
+	SubscriptionTag string `json:"subscription_tag"`
+}
+
+type videoSkillPack struct {
+	Models       []videoModelOption
+	DefaultModel videoModelOption
+}
+
+var fallbackVideoModelValues = map[string]string{
+	"seedance-2.0":      "seedance_v2.0_std",
+	"seedance-2.0-fast": "seedance_v2.0",
+	"seedance-2.0-mini": "seedance_v2.0_mini",
 }
 
 func isVideoModel(model string) bool {
@@ -70,30 +93,36 @@ func videoModelLabel(model string) string {
 		return "Seedance 2.0 Fast"
 	case "seedance-2.0-mini", "seedance_2.0_mini":
 		return "Seedance 2.0 Mini"
+	case "seedance_v2.5":
+		return "Seedance 2.5"
+	case "seedance_v2.0_std":
+		return "Seedance 2.0"
+	case "seedance_v2.0":
+		return "Seedance 2.0 Fast"
+	case "seedance_v2.0_mini":
+		return "Seedance 2.0 Mini"
 	default:
 		return strings.TrimSpace(model)
 	}
 }
 
-func videoModelInstruction(model string) string {
-	model = canonicalVideoModel(model)
-	if model == videoModelID {
-		return ""
-	}
-	return "请使用 " + videoModelLabel(model) + " 生成视频。"
-}
-
-func buildVideoPayload(prompt, ratio, duration, model string) map[string]any {
+func buildVideoPayload(prompt, ratio, duration, modelLabel, resolution, cameraMovement string) map[string]any {
 	parts := []string{"[已确认执行，请直接生成，不要再次询问参数。]"}
-	if instruction := videoModelInstruction(model); instruction != "" {
-		parts = append(parts, instruction)
+	if strings.TrimSpace(modelLabel) != "" {
+		parts = append(parts, "请使用 "+strings.TrimSpace(modelLabel)+" 生成视频。")
 	}
-	parts = append(parts, "画面比例："+ratio)
+	parts = append(parts, "画面比例："+strings.TrimSpace(ratio))
 	if strings.TrimSpace(duration) != "" {
 		parts = append(parts, "视频时长："+strings.TrimSpace(duration))
 	}
-	parts = append(parts, "画面描述："+prompt)
-	text := strings.Join(parts, "\n")
+	if strings.TrimSpace(resolution) != "" {
+		parts = append(parts, "视频分辨率："+strings.TrimSpace(resolution))
+	}
+	if strings.TrimSpace(cameraMovement) != "" {
+		parts = append(parts, "镜头运动："+strings.TrimSpace(cameraMovement))
+	}
+	parts = append(parts, "画面描述："+strings.TrimSpace(prompt))
+	text := videoSkillMention + " " + strings.Join(parts, "\n")
 
 	messageID := randomUUID()
 	localConversationID := "local_" + strings.ReplaceAll(randomUUID(), "-", "")[:16]
@@ -198,9 +227,9 @@ func buildVideoPayload(prompt, ratio, duration, model string) map[string]any {
 				"reasoning_effort":   5,
 			},
 			"aggregate_params": map[string]any{
-				"mention_skill_list":  "[]",
+				"mention_skill_list":  `["doubao-creative-video"]`,
 				"mention_plugin_list": "[]",
-				"mention_ext":         "[{}]",
+				"mention_ext":         `[{"skill":1}]`,
 				"conversation_mode":   "2",
 				"mode_id":             videoAgentModeID,
 				"model_item_key":      videoAgentModelID,
@@ -220,6 +249,7 @@ func buildVideoPayload(prompt, ratio, duration, model string) map[string]any {
 			"collection_id":                 "",
 			"is_finish":                     "1",
 			"commerce_credit_config_enable": "0",
+			"resourcemention":               "1",
 		},
 	}
 }
@@ -426,6 +456,233 @@ func videoAgentParams(c credential) url.Values {
 	return params
 }
 
+func videoRequestHeaders(c credential, accept string) http.Header {
+	headers := http.Header{
+		"Accept":          {accept},
+		"Content-Type":    {"application/json"},
+		"Agw-Js-Conv":     {"str, str"},
+		"User-Agent":      {chromeUA},
+		"Referer":         {c.profile().Root + "/chat/"},
+		"Origin":          {c.profile().Root},
+		"Accept-Language": {c.profile().Language + ",en;q=0.8"},
+		"Cookie":          {c.cookieHeader()},
+	}
+	csrf := strings.TrimSpace(c.Cookies["passport_csrf_token"])
+	if csrf == "" {
+		csrf = strings.TrimSpace(c.Cookies["passport_csrf_token_default"])
+	}
+	if csrf != "" {
+		headers.Set("X-Tt-Passport-Csrf-Token", csrf)
+	}
+	return headers
+}
+
+func doVideoJSONRequest(c credential, path string, body []byte, sender httpSender) (pluginapi.HTTPResponse, error) {
+	resp, err := sender.Do(pluginapi.HTTPRequest{
+		Method:  http.MethodPost,
+		URL:     c.profile().Root + path + "?" + videoAgentParams(c).Encode(),
+		Headers: videoRequestHeaders(c, "application/json, text/plain, */*"),
+		Body:    body,
+	})
+	if err != nil {
+		return resp, pluginabi.NewError("transport_error", "Doubao video API transport failed", http.StatusServiceUnavailable)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return resp, upstreamError(resp.StatusCode, resp.Body)
+	}
+	return resp, nil
+}
+
+func fetchVideoSkillPack(c credential, sender httpSender) (videoSkillPack, error) {
+	resp, err := doVideoJSONRequest(c, "/samantha/skill/pack", []byte(`{"skill_type":17}`), sender)
+	if err != nil {
+		return videoSkillPack{}, err
+	}
+	var root struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+		Msg     string `json:"msg"`
+		Data    struct {
+			VideoGeneration struct {
+				Meta struct {
+					OptionList []struct {
+						Value   string             `json:"value"`
+						Options []videoModelOption `json:"options"`
+					} `json:"option_list"`
+				} `json:"meta"`
+			} `json:"video_generation"`
+		} `json:"data"`
+	}
+	if json.Unmarshal(resp.Body, &root) != nil {
+		return videoSkillPack{}, pluginabi.NewError("upstream_error", "Doubao video skill response was invalid", http.StatusBadGateway)
+	}
+	if root.Code != 0 {
+		return videoSkillPack{}, pluginabi.NewError("upstream_rejected", sanitizeUpstream(firstNonEmpty(root.Message, root.Msg, "video skill unavailable")), http.StatusBadGateway)
+	}
+	pack := videoSkillPack{}
+	for _, group := range root.Data.VideoGeneration.Meta.OptionList {
+		if strings.EqualFold(strings.TrimSpace(group.Value), "model") {
+			pack.Models = append(pack.Models, group.Options...)
+		}
+	}
+	for _, option := range pack.Models {
+		if option.Default {
+			pack.DefaultModel = option
+			break
+		}
+	}
+	if pack.DefaultModel.Value == "" && len(pack.Models) > 0 {
+		pack.DefaultModel = pack.Models[0]
+	}
+	return pack, nil
+}
+
+func videoResolutionFromPayload(payload []byte) string {
+	var root struct {
+		Resolution      string `json:"resolution"`
+		VideoResolution string `json:"video_resolution"`
+	}
+	_ = json.Unmarshal(payload, &root)
+	resolution := strings.ToLower(strings.TrimSpace(firstNonEmpty(root.Resolution, root.VideoResolution)))
+	switch resolution {
+	case "", "auto":
+		return ""
+	case "720":
+		return "720p"
+	case "1080":
+		return "1080p"
+	default:
+		return resolution
+	}
+}
+
+func videoCameraMovementFromPayload(payload []byte) string {
+	var root struct {
+		CameraMovement string `json:"camera_movement"`
+	}
+	_ = json.Unmarshal(payload, &root)
+	return strings.TrimSpace(root.CameraMovement)
+}
+
+func resolveVideoModel(pack videoSkillPack, requested string) (videoModelOption, error) {
+	requested = canonicalVideoModel(requested)
+	if requested == videoModelID {
+		if pack.DefaultModel.Value != "" {
+			return pack.DefaultModel, nil
+		}
+		if len(pack.Models) > 0 {
+			return pack.Models[0], nil
+		}
+		return videoModelOption{Value: "seedance_v2.0_mini", ShowName: "Seedance 2.0 Mini"}, nil
+	}
+	label := videoModelLabel(requested)
+	fallbackValue := fallbackVideoModelValues[requested]
+	for _, option := range pack.Models {
+		if strings.EqualFold(strings.TrimSpace(option.ShowName), label) ||
+			strings.EqualFold(strings.TrimSpace(option.Value), requested) ||
+			(fallbackValue != "" && strings.EqualFold(strings.TrimSpace(option.Value), fallbackValue)) {
+			return option, nil
+		}
+	}
+	if fallbackValue != "" {
+		return videoModelOption{Value: fallbackValue, ShowName: label}, nil
+	}
+	available := make([]string, 0, len(pack.Models))
+	for _, option := range pack.Models {
+		if option.ShowName != "" {
+			available = append(available, option.ShowName)
+		}
+	}
+	if len(available) == 0 {
+		available = []string{"Seedance 2.0", "Seedance 2.0 Fast", "Seedance 2.0 Mini"}
+	}
+	return videoModelOption{}, fmt.Errorf("当前账号没有可用的 %s；可用模型：%s", label, strings.Join(available, "、"))
+}
+
+func fetchVideoGenInfo(c credential, sender httpSender) (int, bool, error) {
+	resp, err := doVideoJSONRequest(c, "/samantha/video/query_video_gen_info", []byte(`{}`), sender)
+	if err != nil {
+		return 0, false, err
+	}
+	var root struct {
+		Code int `json:"code"`
+		Data struct {
+			RemainCount       int  `json:"remain_count"`
+			HasGeneratingTask bool `json:"has_generating_task"`
+		} `json:"data"`
+	}
+	if json.Unmarshal(resp.Body, &root) != nil {
+		return 0, false, pluginabi.NewError("upstream_error", "Doubao video quota response was invalid", http.StatusBadGateway)
+	}
+	if root.Code != 0 {
+		return 0, false, upstreamFailureError("video quota query failed")
+	}
+	return root.Data.RemainCount, root.Data.HasGeneratingTask, nil
+}
+
+func resolveVideoPlayInfo(c credential, vid string, sender httpSender) ([]generatedVideo, error) {
+	vid = strings.TrimSpace(vid)
+	if vid == "" {
+		return nil, nil
+	}
+	resp, err := doVideoJSONRequest(c, "/samantha/video/get_play_info", mustJSON(map[string]any{"vid": vid}), sender)
+	if err != nil {
+		return nil, err
+	}
+	var root any
+	if json.Unmarshal(resp.Body, &root) != nil {
+		return nil, pluginabi.NewError("upstream_error", "Doubao video play info was invalid", http.StatusBadGateway)
+	}
+	seen := map[string]struct{}{}
+	videos := []generatedVideo{}
+	collectVideoPlayInfo(root, &videos, seen)
+	if len(videos) == 0 {
+		return nil, pluginabi.NewError("upstream_error", "Doubao returned a video id without a playable URL", http.StatusBadGateway)
+	}
+	return videos, nil
+}
+
+func collectVideoPlayInfo(value any, videos *[]generatedVideo, seen map[string]struct{}) {
+	switch item := value.(type) {
+	case map[string]any:
+		url := firstNonEmpty(
+			videoValueString(item["main"]),
+			videoValueString(item["main_url"]),
+			videoValueString(item["url"]),
+			videoValueString(item["backup"]),
+		)
+		if strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") {
+			if _, exists := seen[url]; !exists {
+				seen[url] = struct{}{}
+				*videos = append(*videos, generatedVideo{
+					URL:      url,
+					CoverURL: firstNonEmpty(videoValueString(item["cover"]), videoValueString(item["poster_url"])),
+					Width:    asInt(item["width"]),
+					Height:   asInt(item["height"]),
+				})
+			}
+		}
+		for _, child := range item {
+			collectVideoPlayInfo(child, videos, seen)
+		}
+	case []any:
+		for _, child := range item {
+			collectVideoPlayInfo(child, videos, seen)
+		}
+	}
+}
+
+func videoValueString(value any) string {
+	if value == nil {
+		return ""
+	}
+	text := strings.TrimSpace(fmt.Sprintf("%v", value))
+	if text == "<nil>" {
+		return ""
+	}
+	return text
+}
+
 func doVideoRequest(c credential, params url.Values, body []byte, sender httpSender) (pluginapi.HTTPResponse, error) {
 	headers := http.Header{
 		"Accept":          {"text/event-stream"},
@@ -459,13 +716,25 @@ func doVideoRequest(c credential, params url.Values, body []byte, sender httpSen
 	return resp, nil
 }
 
-func generateDoubaoAgentVideo(c credential, prompt, ratio, duration, model string, sender httpSender) (doubaoVideoResult, error) {
-	payload := buildVideoPayload(prompt, ratio, duration, model)
+func generateDoubaoAgentVideo(c credential, prompt, ratio, duration, model, modelLabel, resolution, cameraMovement string, sender httpSender) (doubaoVideoResult, error) {
+	payload := buildVideoPayload(prompt, ratio, duration, modelLabel, resolution, cameraMovement)
 	resp, err := doVideoRequest(c, videoAgentParams(c), mustJSON(payload), sender)
 	if err != nil {
 		return doubaoVideoResult{}, err
 	}
-	return parseDoubaoAgentResponse(resp.Body)
+	result, err := parseDoubaoAgentResponse(resp.Body)
+	if err != nil {
+		return result, err
+	}
+	if len(result.Videos) == 0 && strings.TrimSpace(result.Vid) != "" {
+		videos, playErr := resolveVideoPlayInfo(c, result.Vid, sender)
+		if playErr == nil {
+			result.Videos = videos
+		} else if strings.TrimSpace(result.Text) == "" {
+			return result, playErr
+		}
+	}
+	return result, nil
 }
 
 func parseDoubaoAgentResponse(raw []byte) (doubaoVideoResult, error) {
@@ -547,6 +816,9 @@ func collectAgentVideoValue(value any, result *doubaoVideoResult, seen map[strin
 					result.TaskID = taskID
 				}
 			}
+		}
+		if vid := strings.TrimSpace(fmt.Sprintf("%v", item["vid"])); vid != "" && vid != "<nil>" && result.Vid == "" {
+			result.Vid = vid
 		}
 		for _, child := range item {
 			collectAgentVideoValue(child, result, seen, texts, allowText)
@@ -682,6 +954,12 @@ func resultText(result doubaoVideoResult) string {
 	if result.TaskID != "" {
 		builder.WriteString("\n任务 ID: " + result.TaskID)
 	}
+	if result.Vid != "" {
+		builder.WriteString("\n视频 ID: " + result.Vid)
+	}
+	if result.Remain > 0 {
+		builder.WriteString(fmt.Sprintf("\n账号剩余视频次数: %d", result.Remain))
+	}
 	return strings.TrimSpace(builder.String())
 }
 
@@ -702,12 +980,28 @@ func runVideo(req pluginapi.ExecutorRequest, sender httpSender) (string, doubaoV
 	duration := videoDurationFromPayload(prompt, req.Payload)
 	model := canonicalVideoModel(req.Model)
 	if !confirmed {
-		result := doubaoVideoResult{Plan: true, Text: planVideo(prompt, ratio, duration, model)}
+		result := doubaoVideoResult{Plan: true, Model: model, Text: planVideo(prompt, ratio, duration, model)}
 		return result.Text, result, nil
 	}
-	result, err := generateDoubaoAgentVideo(c, prompt, ratio, duration, model, sender)
+	pack, _ := fetchVideoSkillPack(c, sender)
+	selection, err := resolveVideoModel(pack, model)
+	if err != nil {
+		return "", doubaoVideoResult{}, pluginabi.NewError("invalid_request", err.Error(), http.StatusBadRequest)
+	}
+	resolution := videoResolutionFromPayload(req.Payload)
+	cameraMovement := videoCameraMovementFromPayload(req.Payload)
+	modelLabel := videoModelLabel(selection.ShowName)
+	if strings.TrimSpace(modelLabel) == "" {
+		modelLabel = videoModelLabel(model)
+	}
+	result, err := generateDoubaoAgentVideo(c, prompt, ratio, duration, model, modelLabel, resolution, cameraMovement, sender)
 	if err != nil {
 		return "", doubaoVideoResult{}, err
+	}
+	result.Model = model
+	result.ModelValue = selection.Value
+	if remain, _, infoErr := fetchVideoGenInfo(c, sender); infoErr == nil {
+		result.Remain = remain
 	}
 	return resultText(result), result, nil
 }

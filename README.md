@@ -131,9 +131,30 @@ response.
 }
 ```
 
-The current flow is text-to-video. Model choice is passed to the Doubao agent as
-a prompt-level preference; duration and resolution depend on the account's
-available model capabilities.
+The current flow is text-to-video. The plugin calls `/samantha/skill/pack` to
+resolve the account's real model options, validates the requested model, and
+submits through the official Creative Video skill entry:
+
+```text
+[创意视频](skill://doubao-creative-video?type=2&id=346073050)
+```
+
+It also sets `mention_skill_list` / `mention_ext` in
+`option.aggregate_params` and `resourcemention=1` in `ext`. It never silently
+switches to an unrequested model:
+
+| Requested model | Official value | Notes |
+| --- | --- | --- |
+| `doubao-video` | account default | Currently usually `seedance_v2.0_mini` |
+| `seedance-2.0` | `seedance_v2.0_std` | Requires an enhanced subscription |
+| `seedance-2.0-fast` | `seedance_v2.0` | Usually available without the enhancement |
+| `seedance-2.0-mini` | `seedance_v2.0_mini` | Default, usually available |
+| `seedance-2.5` | from SkillPack | Only when the account actually exposes it |
+
+If `Seedance 2.0` is rejected as subscription-only, use Fast or Mini.
+`query_video_gen_info.remain_count` is an aggregate experience counter, not the
+video-generation quota; the server still checks subscription and the 7-day video
+quota.
 
 ### Companion video skill
 
