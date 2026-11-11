@@ -173,6 +173,37 @@ func TestBuildVideoPayloadUsesVideoAbility(t *testing.T) {
 	}
 }
 
+func TestParseVideoAckMetadata(t *testing.T) {
+	raw := []byte("event: SSE_ACK\ndata: {\"query_list\":[{\"message_index\":1}],\"ack_client_meta\":{\"conversation_id\":\"38453085203652866\",\"last_section_id\":\"38453085203653122\",\"msg_cursor\":2}}\n\n")
+	result, err := parseDoubaoAgentResponse(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.ConversationID != "38453085203652866" || result.SectionID != "38453085203653122" || result.LastMessageIndex != 2 {
+		t.Fatalf("unexpected ack metadata: %+v", result)
+	}
+}
+
+func TestBuildVideoConfirmPayload(t *testing.T) {
+	payload := buildVideoConfirmPayload("38453085203652866", "38453085203653122", 2)
+	clientMeta := mapValue(payload["client_meta"])
+	if clientMeta["conversation_id"] != "38453085203652866" || clientMeta["last_section_id"] != "38453085203653122" || asInt(clientMeta["last_message_index"]) != 2 {
+		t.Fatalf("unexpected client_meta: %#v", clientMeta)
+	}
+	message := mapValue(payload["messages"].([]any)[0])
+	block := mapValue(message["content_block"].([]any)[0])
+	if text := fmtString(block, "content", "text_block", "text"); text != "确认生成" {
+		t.Fatalf("confirm text = %q", text)
+	}
+	if _, exists := payload["chat_ability"]; exists {
+		t.Fatal("confirmation turn must not repeat chat_ability")
+	}
+	option := mapValue(payload["option"])
+	if asInt(option["agent_mode"]) != 2 || option["need_create_conversation"] != false || mapValue(option["aggregate_params"])["mode_id"] != "1" {
+		t.Fatalf("unexpected confirm option: %#v", option)
+	}
+}
+
 func TestVideoAgentParamsMatchBrowserSession(t *testing.T) {
 	c := credential{
 		Type:     credentialProvider,
@@ -321,6 +352,42 @@ func TestExecuteVideoConfirmedOpenAIChat(t *testing.T) {
 	}
 	if !strings.Contains(sender.requests[1].URL, "aid=497858") || !strings.Contains(sender.requests[1].URL, "web_platform=browser") {
 		t.Fatalf("agent URL missing updated params: %s", sender.requests[1].URL)
+	}
+}
+
+func TestExecuteVideoSendsConfirmationTurn(t *testing.T) {
+	if err := configure(nil); err != nil {
+		t.Fatal(err)
+	}
+	plan := []byte("event: SSE_ACK\ndata: {\"query_list\":[{\"message_index\":1}],\"ack_client_meta\":{\"conversation_id\":\"38453085203652866\",\"last_section_id\":\"38453085203653122\",\"msg_cursor\":2}}\n\nevent: STREAM_CHUNK\ndata: {\"patch_op\":[{\"patch_value\":{\"content_block\":[{\"content\":{\"text_block\":{\"text\":\"请先确认参数\"}}}]}}]}\n\n")
+	sender := &sequenceSender{responses: []pluginapi.HTTPResponse{
+		videoSkillPackResponse(),
+		{StatusCode: http.StatusOK, Body: plan},
+		{StatusCode: http.StatusOK, Body: agentSSE(agentVideoEvent("task_1", "https://cdn.example/final.mp4", "https://cdn.example/cover.jpg"))},
+		{StatusCode: http.StatusOK, Body: []byte(`{"code":0,"data":{"remain_count":9,"has_generating_task":false}}`)},
+	}}
+	req := pluginapi.ExecutorRequest{
+		Model:       "seedance-2.0",
+		Format:      "openai",
+		Payload:     []byte(`{"model":"seedance-2.0","confirm":true,"messages":[{"role":"user","content":"a running dog"}]}`),
+		StorageJSON: videoCredentialJSON(t),
+	}
+	resp, err := executeVideo(req, sender)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(resp.Payload), "https://cdn.example/final.mp4") {
+		t.Fatalf("payload lost video URL: %s", resp.Payload)
+	}
+	if len(sender.requests) != 4 {
+		t.Fatalf("expected four requests, got %d", len(sender.requests))
+	}
+	confirm := string(sender.requests[2].Body)
+	if !strings.Contains(confirm, "确认生成") || !strings.Contains(confirm, "38453085203652866") || !strings.Contains(confirm, `"last_section_id":"38453085203653122"`) {
+		t.Fatalf("confirmation turn missing metadata: %s", confirm)
+	}
+	if strings.Contains(confirm, "chat_ability") {
+		t.Fatalf("confirmation turn must not repeat chat_ability: %s", confirm)
 	}
 }
 

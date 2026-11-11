@@ -32,14 +32,17 @@ type generatedVideo struct {
 }
 
 type doubaoVideoResult struct {
-	TaskID     string
-	Vid        string
-	Model      string
-	ModelValue string
-	Remain     int
-	Videos     []generatedVideo
-	Text       string
-	Plan       bool
+	TaskID           string
+	Vid              string
+	Model            string
+	ModelValue       string
+	Remain           int
+	ConversationID   string
+	SectionID        string
+	LastMessageIndex int
+	Videos           []generatedVideo
+	Text             string
+	Plan             bool
 }
 
 type videoModelOption struct {
@@ -249,6 +252,113 @@ func buildVideoPayload(prompt, ratio, duration, modelValue, modelLabel, resoluti
 			"collection_id":                 "",
 			"is_finish":                     "1",
 			"conversation_init_option":      `{"need_ack_conversation":true}`,
+			"commerce_credit_config_enable": "0",
+		},
+	}
+}
+
+func buildVideoConfirmPayload(conversationID, sectionID string, lastMessageIndex int) map[string]any {
+	messageID := randomUUID()
+	now := time.Now()
+	if lastMessageIndex < 0 {
+		lastMessageIndex = 0
+	}
+	return map[string]any{
+		"client_meta": map[string]any{
+			"conversation_id":    conversationID,
+			"bot_id":             videoAgentBotID,
+			"last_section_id":    sectionID,
+			"last_message_index": lastMessageIndex,
+			"local_permissions": []any{
+				map[string]any{"permission_name": "ACCESS_COARSE_LOCATION", "status": 3},
+				map[string]any{"permission_name": "ACCESS_FINE_LOCATION", "status": 3},
+				map[string]any{"permission_name": "ACCESS_BACKGROUND_LOCATION", "status": 3},
+			},
+		},
+		"messages": []any{map[string]any{
+			"local_message_id": messageID,
+			"content_block": []any{map[string]any{
+				"block_type": 10000,
+				"content": map[string]any{
+					"text_block": map[string]any{
+						"text":          "确认生成",
+						"icon_url":      "",
+						"icon_url_dark": "",
+						"summary":       "",
+					},
+					"pc_event_block": "",
+				},
+				"block_id":      randomUUID(),
+				"parent_id":     "",
+				"meta_info":     []any{},
+				"extra_info":    map[string]any{},
+				"append_fields": []any{},
+			}},
+			"message_status": 0,
+		}},
+		"option": map[string]any{
+			"send_message_scene":        "",
+			"create_time_ms":            now.UnixMilli(),
+			"collect_id":                "",
+			"is_audio":                  false,
+			"answer_with_suggest":       false,
+			"agent_mode":                2,
+			"tts_switch":                false,
+			"need_deep_think":           0,
+			"click_clear_context":       false,
+			"from_suggest":              false,
+			"is_regen":                  false,
+			"is_replace":                false,
+			"is_from_click_option":      false,
+			"is_from_click_softlink":    false,
+			"disable_sse_cache":         false,
+			"select_text_action":        "",
+			"is_select_text":            false,
+			"resend_for_regen":          false,
+			"scene_type":                0,
+			"unique_key":                randomUUID(),
+			"start_seq":                 0,
+			"need_create_conversation":  false,
+			"regen_query_id":            []any{},
+			"edit_query_id":             []any{},
+			"regen_instruction":         "",
+			"no_replace_for_regen":      false,
+			"message_from":              0,
+			"shared_app_name":           "",
+			"shared_app_id":             "",
+			"sse_recv_event_options":    map[string]any{"support_chunk_delta": true},
+			"support_lazy_fetch_stream": true,
+			"is_ai_playground":          false,
+			"is_old_user":               true,
+			"general_task_param":        map[string]any{"runtime_type": 0, "agent_task_param": map[string]any{}, "project_id": "", "server_do_compare": true},
+			"recovery_option": map[string]any{
+				"is_recovery":            false,
+				"req_create_time_sec":    now.Unix(),
+				"append_sse_event_scene": 0,
+			},
+			"message_storage_type":        0,
+			"related_deleted_message_ids": map[string]any{},
+			"connector_info_list":         []any{},
+			"model_config":                map[string]any{"model_item_key": "0", "model_extra_params": map[string]any{}, "reasoning_effort": 5},
+			"aggregate_params": map[string]any{
+				"mention_skill_list":  "[]",
+				"mention_plugin_list": "[]",
+				"mention_ext":         "[{}]",
+				"conversation_mode":   "",
+				"mode_id":             "1",
+				"model_item_key":      "0",
+				"agent_mode":          "2",
+				"reasoning_effort":    "5",
+				"provider_id":         "",
+			},
+		},
+		"user_context": []any{},
+		"ext": map[string]any{
+			"agent_mode":                    "2",
+			"use_deep_think":                "0",
+			"general_task_param":            `{"runtime_type":0,"agent_task_param":{},"project_id":"","server_do_compare":true}`,
+			"collection_id":                 "",
+			"is_finish":                     "1",
 			"commerce_credit_config_enable": "0",
 		},
 	}
@@ -728,6 +838,29 @@ func generateDoubaoAgentVideo(c credential, prompt, ratio, duration, modelValue,
 	if err != nil {
 		return result, err
 	}
+	if len(result.Videos) == 0 && result.Vid == "" && result.ConversationID != "" {
+		confirm := buildVideoConfirmPayload(result.ConversationID, result.SectionID, result.LastMessageIndex)
+		confirmResp, confirmErr := doVideoRequest(c, videoAgentParams(c), mustJSON(confirm), sender)
+		if confirmErr != nil {
+			return result, confirmErr
+		}
+		confirmed, confirmParseErr := parseDoubaoAgentResponse(confirmResp.Body)
+		if confirmParseErr != nil {
+			return result, confirmParseErr
+		}
+		for _, video := range confirmed.Videos {
+			result.Videos = append(result.Videos, video)
+		}
+		if confirmed.Vid != "" {
+			result.Vid = confirmed.Vid
+		}
+		if confirmed.TaskID != "" {
+			result.TaskID = confirmed.TaskID
+		}
+		if confirmed.Text != "" {
+			result.Text = confirmed.Text
+		}
+	}
 	if len(result.Videos) == 0 && strings.TrimSpace(result.Vid) != "" {
 		videos, playErr := resolveVideoPlayInfo(c, result.Vid, sender)
 		if playErr == nil {
@@ -773,6 +906,25 @@ func parseDoubaoAgentResponse(raw []byte) (doubaoVideoResult, error) {
 					return result, pluginabi.NewError("reauth_required", "Doubao session or verification challenge rejected the video request", http.StatusUnauthorized)
 				}
 				return result, pluginabi.NewError("upstream_rejected", sanitizeUpstream(fmt.Sprintf("Doubao video error %d: %v", code, event["error_msg"])), http.StatusBadGateway)
+			}
+		}
+		if eventName == "SSE_ACK" {
+			ack := mapValue(event["ack_client_meta"])
+			if value := strings.TrimSpace(fmt.Sprintf("%v", ack["conversation_id"])); value != "" && value != "<nil>" {
+				result.ConversationID = value
+			}
+			if value := strings.TrimSpace(fmt.Sprintf("%v", firstNonEmpty(fmt.Sprintf("%v", ack["last_section_id"]), fmt.Sprintf("%v", ack["section_id"])))); value != "" && value != "<nil>" {
+				result.SectionID = value
+			}
+			if index := asInt(ack["msg_cursor"]); index > 0 {
+				result.LastMessageIndex = index
+			} else if index := asInt(ack["latest_index"]); index > 0 {
+				result.LastMessageIndex = index
+			}
+			if list, ok := event["query_list"].([]any); ok && len(list) > 0 {
+				if index := asInt(mapValue(list[0])["message_index"]); index > result.LastMessageIndex {
+					result.LastMessageIndex = index
+				}
 			}
 		}
 		allowText := eventName == "STREAM_CHUNK" || eventName == "STREAM_MSG_NOTIFY"
