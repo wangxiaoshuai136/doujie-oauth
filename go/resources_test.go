@@ -44,6 +44,16 @@ func TestManagementResourcesAreStaticOnly(t *testing.T) {
 			t.Fatalf("dynamic auth route registered as public resource: %s", path)
 		}
 	}
+	routes, ok := registration["routes"].([]map[string]any)
+	if !ok || len(routes) == 0 {
+		t.Fatalf("missing authenticated management routes: %T", registration["routes"])
+	}
+	for _, item := range routes {
+		path, _ := item["Path"].(string)
+		if !strings.HasPrefix(path, "/v0/management/doujie-oauth/") {
+			t.Fatalf("management route outside the authenticated prefix: %s", path)
+		}
+	}
 }
 
 func TestManagementServesLogoAndDescriptor(t *testing.T) {

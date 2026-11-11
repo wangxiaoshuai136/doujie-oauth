@@ -138,6 +138,16 @@ OAuth 发起和轮询使用 CPA 原生受认证管理 API，公共插件资源�
 `query_video_gen_info.remain_count` 是聚合体验次数，不等于视频生成额度；最终是否
 能生成仍由豆包服务端校验订阅和 7 天视频额度。
 
+确认后的视频任务按凭证隔离：同一个 auth 文件同时只允许一个任务；提交前会检查
+`has_generating_task`；遇到额度错误会解析服务端 `reset_at` 并写入该账号的冷却，
+后续调用直接返回带 `Retry-After` 的 `429`，不再重复打豆包。可通过认证后的管理
+接口查看或清除：
+
+- `GET /v0/management/doujie-oauth/video/status`
+- `POST /v0/management/doujie-oauth/video/cooldowns/clear`，请求体 `{"auth_id":""}`
+
+这些接口不在公开插件资源路由下。
+
 ### 独立视频 Skill
 
 配套的独立视频 Skill 已拆分到单独仓库：

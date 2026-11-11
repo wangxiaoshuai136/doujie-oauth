@@ -158,6 +158,18 @@ If `Seedance 2.0` is rejected as subscription-only, use Fast or Mini.
 video-generation quota; the server still checks subscription and the 7-day video
 quota.
 
+Confirmed video tasks are isolated per credential: only one task can run for a
+given auth file, the plugin checks `has_generating_task` before submitting, and a
+quota response is converted into a per-account cooldown using the server's
+`reset_at`. Subsequent calls return `429` with `Retry-After` instead of hitting
+Doubao again. Operators can inspect and clear this state through the
+authenticated management API:
+
+- `GET /v0/management/doujie-oauth/video/status`
+- `POST /v0/management/doujie-oauth/video/cooldowns/clear` with `{"auth_id":""}`
+
+These routes are not public plugin resources.
+
 ### Companion video skill
 
 The companion Python skill lives in its own repository:

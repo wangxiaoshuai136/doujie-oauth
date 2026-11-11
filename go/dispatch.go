@@ -8,7 +8,7 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
 )
 
-var pluginVersion = "0.2.1"
+var pluginVersion = "0.2.2"
 
 type rpcAuthStart struct {
 	pluginapi.AuthLoginStartRequest
@@ -141,20 +141,26 @@ func handleMethod(method string, raw []byte) (any, error) {
 	case "auth.refresh":
 		return nil, pluginabi.NewError("reauth_required", "Sessions cannot be refreshed; sign in again", 400)
 	case "management.register":
-		return map[string]any{"resources": []map[string]any{
-			{"path": "/logo.png", "menu": "", "description": "Plugin logo."},
-			{"path": "/imported.html", "menu": "", "description": "Desktop import result page."},
-			{"path": "/account.html", "menu": "", "description": "Browser-based account sign-in page."},
-			{"path": "/doubao.png", "menu": "", "description": "Domestic sign-in logo."},
-			{"path": "/dola.png", "menu": "", "description": "International sign-in logo."},
-			{"path": "/doujie.json", "menu": "", "description": "Public plugin declaration."},
-		}}, nil
+		return map[string]any{
+			"routes": []map[string]any{
+				{"Method": "GET", "Path": "/v0/management/doujie-oauth/video/status", "Description": "Video task leases and quota cooldowns."},
+				{"Method": "POST", "Path": "/v0/management/doujie-oauth/video/cooldowns/clear", "Description": "Clear one or all video quota cooldowns."},
+			},
+			"resources": []map[string]any{
+				{"path": "/logo.png", "menu": "", "description": "Plugin logo."},
+				{"path": "/imported.html", "menu": "", "description": "Desktop import result page."},
+				{"path": "/account.html", "menu": "", "description": "Browser-based account sign-in page."},
+				{"path": "/doubao.png", "menu": "", "description": "Domestic sign-in logo."},
+				{"path": "/dola.png", "menu": "", "description": "International sign-in logo."},
+				{"path": "/doujie.json", "menu": "", "description": "Public plugin declaration."},
+			},
+		}, nil
 	case "management.handle":
 		var req pluginapi.ManagementRequest
 		if err := unmarshal(raw, &req); err != nil {
 			return nil, err
 		}
-		return handleManagementResource(req)
+		return handleManagementRequest(req)
 	case "model.static":
 		return pluginapi.ModelResponse{Provider: credentialProvider, Models: staticModels()}, nil
 	case "model.for_auth":

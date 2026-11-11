@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
 )
@@ -227,6 +228,74 @@ func TestVideoAgentParamsMatchBrowserSession(t *testing.T) {
 	}
 }
 
+func TestVideoTaskLeaseAndCooldown(t *testing.T) {
+	resetVideoState()
+	if err := acquireVideoTask("auth-a"); err != nil {
+		t.Fatal(err)
+	}
+	if err := acquireVideoTask("auth-a"); err == nil {
+		t.Fatal("second task on the same auth must be rejected")
+	}
+	if err := acquireVideoTask("auth-b"); err != nil {
+		t.Fatalf("different auth should be independent: %v", err)
+	}
+	releaseVideoTask("auth-a")
+	releaseVideoTask("auth-b")
+	setVideoCooldown("auth-a", time.Now().Add(time.Hour), "quota reset")
+	if err := acquireVideoTask("auth-a"); err == nil {
+		t.Fatal("cooldown must reject the task")
+	}
+	if cleared := clearVideoCooldown("auth-a"); cleared != 1 {
+		t.Fatalf("cleared = %d", cleared)
+	}
+	if err := acquireVideoTask("auth-a"); err != nil {
+		t.Fatalf("task should be allowed after clearing cooldown: %v", err)
+	}
+	releaseVideoTask("auth-a")
+}
+
+func TestParseVideoCooldownReset(t *testing.T) {
+	raw := []byte(`data: {"patch_value":{"ext":{"inner_paywall_cta_param":"{\"snapshot\":\"{\\\"reset_at\\\":1794571796361}\"}"}}}` + "\n\n")
+	result, err := parseDoubaoAgentResponse(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.CooldownUntil.IsZero() || result.CooldownUntil.UnixMilli() != 1794571796361 {
+		t.Fatalf("cooldown = %v", result.CooldownUntil)
+	}
+}
+
+func TestVideoManagementStatus(t *testing.T) {
+	resetVideoState()
+	if err := acquireVideoTask("auth-status"); err != nil {
+		t.Fatal(err)
+	}
+	defer releaseVideoTask("auth-status")
+	resp, err := handleManagementRequest(pluginapi.ManagementRequest{Method: "GET", Path: "/v0/management/doujie-oauth/video/status"})
+	if err != nil || resp.StatusCode != 200 || !strings.Contains(string(resp.Body), "auth-status") {
+		t.Fatalf("status response: %d %v %s", resp.StatusCode, err, resp.Body)
+	}
+	setVideoCooldown("auth-status", time.Now().Add(time.Hour), "quota reset")
+	resp, err = handleManagementRequest(pluginapi.ManagementRequest{Method: "POST", Path: "/v0/management/doujie-oauth/video/cooldowns/clear", Body: []byte(`{"auth_id":"auth-status"}`)})
+	if err != nil || resp.StatusCode != 200 || !strings.Contains(string(resp.Body), `"cleared":1`) {
+		t.Fatalf("clear response: %d %v %s", resp.StatusCode, err, resp.Body)
+	}
+}
+
+func TestSanitizeUpstreamRedactsURL(t *testing.T) {
+	got := sanitizeUpstream("failed at https://cdn.example/video.mp4?token=secret&x=1 now")
+	if strings.Contains(got, "token=secret") || !strings.Contains(got, "https://cdn.example/video.mp4") {
+		t.Fatalf("redaction failed: %s", got)
+	}
+}
+
+func resetVideoState() {
+	videoStateMu.Lock()
+	videoTasks = map[string]videoTaskState{}
+	videoCooldowns = map[string]videoCooldownState{}
+	videoStateMu.Unlock()
+}
+
 func fmtString(root map[string]any, path ...string) string {
 	current := any(root)
 	for _, key := range path {
@@ -320,6 +389,7 @@ func TestExecuteVideoConfirmedOpenAIChat(t *testing.T) {
 		t.Fatal(err)
 	}
 	sender := &sequenceSender{responses: []pluginapi.HTTPResponse{
+		{StatusCode: http.StatusOK, Body: []byte(`{"code":0,"data":{"remain_count":9,"has_generating_task":false}}`)},
 		videoSkillPackResponse(),
 		{
 			StatusCode: http.StatusOK,
@@ -340,18 +410,18 @@ func TestExecuteVideoConfirmedOpenAIChat(t *testing.T) {
 	if !strings.Contains(string(resp.Payload), "https://cdn.example/final.mp4") {
 		t.Fatalf("payload lost video URL: %s", resp.Payload)
 	}
-	if len(sender.requests) != 3 || !strings.Contains(sender.requests[0].URL, "/samantha/skill/pack") || !strings.Contains(sender.requests[1].URL, "/chat/completion") {
+	if len(sender.requests) != 4 || !strings.Contains(sender.requests[1].URL, "/samantha/skill/pack") || !strings.Contains(sender.requests[2].URL, "/chat/completion") {
 		t.Fatalf("requests = %#v", sender.requests)
 	}
-	body := string(sender.requests[1].Body)
+	body := string(sender.requests[2].Body)
 	if !strings.Contains(body, `"chat_ability"`) || !strings.Contains(body, `"ability_type":17`) || !strings.Contains(body, "seedance_v2.0_std") || !strings.Contains(body, "生成视频：a running dog") {
 		t.Fatalf("submit body missing video ability: %s", body)
 	}
 	if strings.Contains(body, "skill://doubao-creative-video") {
 		t.Fatalf("submit body still uses the quota-limited creative video skill: %s", body)
 	}
-	if !strings.Contains(sender.requests[1].URL, "aid=497858") || !strings.Contains(sender.requests[1].URL, "web_platform=browser") {
-		t.Fatalf("agent URL missing updated params: %s", sender.requests[1].URL)
+	if !strings.Contains(sender.requests[2].URL, "aid=497858") || !strings.Contains(sender.requests[2].URL, "web_platform=browser") {
+		t.Fatalf("agent URL missing updated params: %s", sender.requests[2].URL)
 	}
 }
 
@@ -361,6 +431,7 @@ func TestExecuteVideoSendsConfirmationTurn(t *testing.T) {
 	}
 	plan := []byte("event: SSE_ACK\ndata: {\"query_list\":[{\"message_index\":1}],\"ack_client_meta\":{\"conversation_id\":\"38453085203652866\",\"last_section_id\":\"38453085203653122\",\"msg_cursor\":2}}\n\nevent: STREAM_CHUNK\ndata: {\"patch_op\":[{\"patch_value\":{\"content_block\":[{\"content\":{\"text_block\":{\"text\":\"请先确认参数\"}}}]}}]}\n\n")
 	sender := &sequenceSender{responses: []pluginapi.HTTPResponse{
+		{StatusCode: http.StatusOK, Body: []byte(`{"code":0,"data":{"remain_count":9,"has_generating_task":false}}`)},
 		videoSkillPackResponse(),
 		{StatusCode: http.StatusOK, Body: plan},
 		{StatusCode: http.StatusOK, Body: agentSSE(agentVideoEvent("task_1", "https://cdn.example/final.mp4", "https://cdn.example/cover.jpg"))},
@@ -379,10 +450,10 @@ func TestExecuteVideoSendsConfirmationTurn(t *testing.T) {
 	if !strings.Contains(string(resp.Payload), "https://cdn.example/final.mp4") {
 		t.Fatalf("payload lost video URL: %s", resp.Payload)
 	}
-	if len(sender.requests) != 4 {
-		t.Fatalf("expected four requests, got %d", len(sender.requests))
+	if len(sender.requests) != 5 {
+		t.Fatalf("expected five requests, got %d", len(sender.requests))
 	}
-	confirm := string(sender.requests[2].Body)
+	confirm := string(sender.requests[3].Body)
 	if !strings.Contains(confirm, "确认生成") || !strings.Contains(confirm, "38453085203652866") || !strings.Contains(confirm, `"last_section_id":"38453085203653122"`) {
 		t.Fatalf("confirmation turn missing metadata: %s", confirm)
 	}

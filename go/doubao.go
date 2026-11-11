@@ -323,6 +323,7 @@ func sseData(block string) string {
 
 func sanitizeUpstream(raw string) string {
 	raw = strings.TrimSpace(raw)
+	raw = upstreamURLPattern.ReplaceAllStringFunc(raw, redactURL)
 	if len(raw) > 300 {
 		raw = raw[:300]
 	}
@@ -330,6 +331,18 @@ func sanitizeUpstream(raw string) string {
 		raw = "upstream request failed"
 	}
 	return raw
+}
+
+func redactURL(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" {
+		return "[redacted-url]"
+	}
+	u.RawQuery = ""
+	u.ForceQuery = false
+	u.Fragment = ""
+	u.User = nil
+	return u.String()
 }
 
 func mustJSON(v any) []byte {

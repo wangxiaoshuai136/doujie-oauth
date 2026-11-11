@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -22,6 +23,8 @@ const (
 )
 
 var durationPattern = regexp.MustCompile(`(?i)(\d{1,2})\s*(秒|s|sec|seconds)`)
+var videoResetPattern = regexp.MustCompile(`reset_at[^0-9]{0,8}(\d{10,})`)
+var upstreamURLPattern = regexp.MustCompile(`https?://[^\s"'<>]+`)
 
 type generatedVideo struct {
 	URL      string
@@ -40,6 +43,7 @@ type doubaoVideoResult struct {
 	ConversationID   string
 	SectionID        string
 	LastMessageIndex int
+	CooldownUntil    time.Time
 	Videos           []generatedVideo
 	Text             string
 	Plan             bool
@@ -931,6 +935,13 @@ func parseDoubaoAgentResponse(raw []byte) (doubaoVideoResult, error) {
 		collectAgentVideoValue(event, &result, seen, &texts, allowText)
 	}
 	result.Text = strings.Join(texts, "")
+	if match := videoResetPattern.FindStringSubmatch(string(raw)); len(match) > 1 {
+		if millis, err := strconv.ParseInt(match[1], 10, 64); err == nil && millis > 0 {
+			result.CooldownUntil = time.UnixMilli(millis)
+		}
+	} else if strings.Contains(string(raw), "额度已用完") {
+		result.CooldownUntil = time.Now().Add(time.Hour)
+	}
 	return result, nil
 }
 
@@ -1122,6 +1133,10 @@ func runVideo(req pluginapi.ExecutorRequest, sender httpSender) (string, doubaoV
 	if err != nil {
 		return "", doubaoVideoResult{}, pluginabi.NewError("invalid_auth", "invalid Doubao credential", http.StatusUnauthorized)
 	}
+	if err = acquireVideoTask(req.AuthID); err != nil {
+		return "", doubaoVideoResult{}, err
+	}
+	defer releaseVideoTask(req.AuthID)
 	format := formatOf(req)
 	prompt, confirmed, err := extractVideoRequest(format, req.Payload)
 	if err != nil {
@@ -1137,6 +1152,9 @@ func runVideo(req pluginapi.ExecutorRequest, sender httpSender) (string, doubaoV
 		result := doubaoVideoResult{Plan: true, Model: model, Text: planVideo(prompt, ratio, duration, model)}
 		return result.Text, result, nil
 	}
+	if _, busy, infoErr := fetchVideoGenInfo(c, sender); infoErr == nil && busy {
+		return "", doubaoVideoResult{}, pluginabi.NewError("video_busy", "该账号已有正在生成的视频任务", http.StatusConflict)
+	}
 	pack, _ := fetchVideoSkillPack(c, sender)
 	selection, err := resolveVideoModel(pack, model)
 	if err != nil {
@@ -1147,16 +1165,36 @@ func runVideo(req pluginapi.ExecutorRequest, sender httpSender) (string, doubaoV
 	if strings.TrimSpace(modelLabel) == "" {
 		modelLabel = videoModelLabel(model)
 	}
+	setVideoTaskPhase(req.AuthID, "generating")
 	result, err := generateDoubaoAgentVideo(c, prompt, ratio, duration, selection.Value, modelLabel, resolution, sender)
 	if err != nil {
+		if videoAuthFailure(err) {
+			setVideoCooldown(req.AuthID, time.Now().Add(10*time.Minute), "需要重新登录或通过验证")
+		}
 		return "", doubaoVideoResult{}, err
 	}
+	if !result.CooldownUntil.IsZero() {
+		setVideoCooldown(req.AuthID, result.CooldownUntil, "视频额度已用完")
+		retryAfter := int(time.Until(result.CooldownUntil).Seconds())
+		if retryAfter < 1 {
+			retryAfter = 1
+		}
+		quotaErr := pluginabi.NewError("quota_exhausted", fmt.Sprintf("视频额度已用完，预计 %s 恢复", result.CooldownUntil.Local().Format("2006-01-02 15:04")), http.StatusTooManyRequests)
+		quotaErr.RetryAfterSeconds = retryAfter
+		return "", result, quotaErr
+	}
+	clearVideoCooldown(req.AuthID)
 	result.Model = model
 	result.ModelValue = selection.Value
 	if remain, _, infoErr := fetchVideoGenInfo(c, sender); infoErr == nil {
 		result.Remain = remain
 	}
 	return resultText(result), result, nil
+}
+
+func videoAuthFailure(err error) bool {
+	var pluginErr *pluginabi.Error
+	return errors.As(err, &pluginErr) && pluginErr.HTTPStatus == http.StatusUnauthorized
 }
 
 func executeVideo(req pluginapi.ExecutorRequest, sender httpSender) (pluginapi.ExecutorResponse, error) {

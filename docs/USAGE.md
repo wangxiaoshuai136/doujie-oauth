@@ -134,6 +134,18 @@ account does not have it. `query_video_gen_info.remain_count` is not the video
 quota; the server still checks subscription and the 7-day video quota. It is
 currently text-to-video only.
 
+Each credential has an isolated video-task lease: a second confirmed task for the
+same auth returns `409 video_busy`, and a pre-submit `has_generating_task` check
+prevents duplicate work. Quota responses are converted to a per-account cooldown
+using the server's `reset_at`; later calls return `429` with `Retry-After`
+instead of repeating the upstream request. Operators can view or clear this state
+through authenticated management routes:
+
+- `GET /v0/management/doujie-oauth/video/status`
+- `POST /v0/management/doujie-oauth/video/cooldowns/clear` with `{"auth_id":""}`
+
+These routes are not exposed under the public resource prefix.
+
 ## 6. Quota Card and Reset Cards
 
 The plugin synchronizes subscription quotas and reset cards using authorized
