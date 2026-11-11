@@ -20,6 +20,10 @@
   <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a>
 </p>
 
+<p align="center">
+  Changelog: <a href="CHANGELOG.md">CHANGELOG.md</a>
+</p>
+
 Doujie OAuth adds the `doubao` provider to CLIProxyAPI. After you explicitly
 choose a domestic or Dola international entry and finish sign-in, CPA gains
 model discovery, native Anthropic Messages, OpenAI Chat Completions and OpenAI

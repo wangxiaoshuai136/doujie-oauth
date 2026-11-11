@@ -20,6 +20,10 @@
   <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a>
 </p>
 
+<p align="center">
+  更新日志：<a href="CHANGELOG.md">CHANGELOG.md</a>
+</p>
+
 Doujie OAuth 为 CLIProxyAPI 增加 `doubao` provider。在面板中显式选择国内版或
 Dola 国际版入口并完成登录后，CPA 即获得模型发现、Anthropic Messages、OpenAI Chat
 Completions、OpenAI Responses 原生执行，以及标准化配额与重置卡能力——无需本地
