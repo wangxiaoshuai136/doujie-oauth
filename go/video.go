@@ -441,6 +441,8 @@ func videoAgentParams(c credential) url.Values {
 	params.Set("pc_version", profile.WebVersion)
 	params.Set("doubao_pc_version", profile.WebVersion)
 	params.Set("web_platform", "browser")
+	params.Set("tea_uuid", c.WebID)
+	params.Del("msToken")
 	if profile.ID == siteCN {
 		params.Set("tz_name", "Asia/Shanghai")
 	} else {

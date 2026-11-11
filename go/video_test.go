@@ -173,6 +173,29 @@ func TestBuildVideoPayloadUsesVideoAbility(t *testing.T) {
 	}
 }
 
+func TestVideoAgentParamsMatchBrowserSession(t *testing.T) {
+	c := credential{
+		Type:     credentialProvider,
+		Site:     siteCN,
+		DeviceID: "7706030315161437730",
+		WebID:    "7706030335150245418",
+		Cookies:  map[string]string{"msToken": "stale-token", "s_v_web_id": "verify_browser"},
+	}
+	params := videoAgentParams(c)
+	if params.Get("tea_uuid") != c.WebID {
+		t.Fatalf("tea_uuid must match web_id: %q", params.Get("tea_uuid"))
+	}
+	if params.Get("msToken") != "" {
+		t.Fatalf("video requests must not replay a stale msToken: %q", params.Get("msToken"))
+	}
+	if params.Get("pc_version") != "3.45.1" || params.Get("doubao_pc_version") != "3.45.1" {
+		t.Fatalf("unexpected web versions: pc=%q doubao=%q", params.Get("pc_version"), params.Get("doubao_pc_version"))
+	}
+	if params.Get("fp") != "verify_browser" {
+		t.Fatalf("unexpected fingerprint: %q", params.Get("fp"))
+	}
+}
+
 func fmtString(root map[string]any, path ...string) string {
 	current := any(root)
 	for _, key := range path {
