@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.5 — 2026-11-15
+
+### 登录体验
+
+- 浏览器登录不再无条件自动弹出：新增 `auto_open_browser` 设置；设为 `false` 时不启动浏览器，改为返回扫码登录。
+- 新增 `browser` 设置，可选 `auto`、`chrome`、`edge`，或浏览器可执行文件的绝对路径；默认仍跟随系统默认 Chromium。
+- 如果宿主通过 OAuth metadata 传入 `auto_open`、`browser`、`browser_name`、`browser_path` 等字段，插件会优先遵循宿主设置。
+- 未配置时保持原有行为：自动打开系统默认 Chromium，并使用隔离临时配置读取登录态。
+
+### 升级说明
+
+- 默认行为不变，现有部署无需改配置。
+- 如果希望“只生成登录链接/扫码、不自动弹浏览器”，设置 `auto_open_browser: false`。
+- 如果指定浏览器，设置 `browser: chrome`、`browser: edge` 或绝对路径。
+
 ## 0.2.4 — 2026-11-15
 
 ### 安全

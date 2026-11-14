@@ -230,7 +230,7 @@ func TestResolveBrowserExecutableOverride(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("DOUJIE_BROWSER_PATH", path)
-	got, err := resolveBrowserExecutableForUser(t.TempDir(), 0)
+	got, err := resolveBrowserExecutableForUser(t.TempDir(), 0, "auto")
 	if err != nil {
 		t.Fatal(err)
 	}

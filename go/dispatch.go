@@ -8,7 +8,7 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
 )
 
-var pluginVersion = "0.2.4"
+var pluginVersion = "0.2.5"
 
 type rpcAuthStart struct {
 	pluginapi.AuthLoginStartRequest
@@ -69,6 +69,8 @@ func registration() any {
 				{Name: "public_base_url", Type: pluginapi.ConfigFieldTypeString, Description: "Optional absolute CPA base URL used for the static login result pages."},
 				{Name: "endpoint", Type: pluginapi.ConfigFieldTypeEnum, EnumValues: []string{"samantha", "chat"}, Description: "Upstream endpoint family: samantha (default, direct HTTP) or chat (desktop completion, usually needs an external signer)."},
 				{Name: "app_version", Type: pluginapi.ConfigFieldTypeString, Description: "Doubao desktop client version sent in request parameters (default 2.1.7)."},
+				{Name: "auto_open_browser", Type: pluginapi.ConfigFieldTypeBoolean, Description: "Open the isolated browser automatically. When false, browser sign-in returns a QR login instead of launching a browser."},
+				{Name: "browser", Type: pluginapi.ConfigFieldTypeString, Description: "Browser for account sign-in: auto, chrome, edge, or an absolute executable path."},
 			},
 		},
 		"capabilities": map[string]any{

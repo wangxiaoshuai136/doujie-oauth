@@ -64,6 +64,16 @@ This mode requires a desktop Windows session and a Chromium-compatible default
 browser. Set `DOUJIE_BROWSER_PATH` if the browser is installed in a non-standard
 location.
 
+Browser launch follows the plugin/software settings:
+
+- `auto_open_browser: false` (or OAuth metadata `auto_open=false`) does not open
+  a browser; the plugin returns a QR login response instead.
+- `browser: auto|chrome|edge|<absolute path>` selects the browser to launch.
+  OAuth metadata `browser`, `browser_name`, `browser_path`, or `browser_executable`
+  takes precedence when the host supplies it.
+- The plugin still validates that the selected browser is Chromium-compatible and
+  uses an isolated temporary profile for cookie capture.
+
 ### Session Lifetime
 
 Sessions are long-lived. When upstream rejects credentials (HTTP 401),

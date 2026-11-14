@@ -148,8 +148,16 @@ func startLogin(req pluginapi.AuthLoginStartRequest, sender httpSender) (plugina
 	}
 	switch req.Provider {
 	case entryID, browserEntryID:
+		if !autoOpenBrowser(req.Metadata) {
+			req.Provider = domesticQREntryID
+			return startLogin(req, sender)
+		}
 		return startBrowserAccountLogin(req, key, siteCN)
 	case internationalEntryID, dolaBrowserEntryID:
+		if !autoOpenBrowser(req.Metadata) {
+			req.Provider = internationalQREntryID
+			return startLogin(req, sender)
+		}
 		return startBrowserAccountLogin(req, key, siteGlobal)
 	}
 	if req.Provider == desktopEntryID {
@@ -583,7 +591,7 @@ func startDesktopImport(req pluginapi.AuthLoginStartRequest, sender httpSender, 
 
 func startBrowserAccountLogin(req pluginapi.AuthLoginStartRequest, key []byte, site string) (pluginapi.AuthLoginStartResponse, error) {
 	var out pluginapi.AuthLoginStartResponse
-	browser, err := startBrowserLogin(site)
+	browser, err := startBrowserLoginWithBrowser(site, browserPreference(req.Metadata))
 	if err != nil {
 		return out, fmt.Errorf("cannot open browser sign-in: %w", err)
 	}
@@ -611,4 +619,39 @@ func startBrowserAccountLogin(req pluginapi.AuthLoginStartRequest, key []byte, s
 			"message": "已打开浏览器，请使用手机号、密码或短信验证码完成登录",
 		},
 	}, nil
+}
+
+func autoOpenBrowser(metadata map[string]any) bool {
+	for _, key := range []string{"auto_open", "autoOpen", "open_browser", "openBrowser", "open_browser_url"} {
+		value, ok := metadata[key]
+		if !ok {
+			continue
+		}
+		switch strings.ToLower(strings.TrimSpace(fmt.Sprintf("%v", value))) {
+		case "false", "0", "no", "off", "none", "manual", "link", "不自动打开":
+			return false
+		case "true", "1", "yes", "on", "auto":
+			return true
+		}
+	}
+	for _, key := range []string{"browser", "browser_name", "browserName"} {
+		if value, ok := metadata[key]; ok {
+			switch strings.ToLower(strings.TrimSpace(fmt.Sprintf("%v", value))) {
+			case "none", "manual", "link", "不自动打开":
+				return false
+			}
+		}
+	}
+	return getConfig().AutoOpenBrowser
+}
+
+func browserPreference(metadata map[string]any) string {
+	for _, key := range []string{"browser", "browser_name", "browserName", "browser_path", "browserPath", "browser_executable"} {
+		if value, ok := metadata[key]; ok {
+			if preference := strings.TrimSpace(fmt.Sprintf("%v", value)); preference != "" && preference != "<nil>" {
+				return preference
+			}
+		}
+	}
+	return getConfig().Browser
 }

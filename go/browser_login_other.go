@@ -20,6 +20,10 @@ type browserLogin struct {
 }
 
 func startBrowserLogin(site string) (*browserLogin, error) {
+	return startBrowserLoginWithBrowser(site, "auto")
+}
+
+func startBrowserLoginWithBrowser(site, browser string) (*browserLogin, error) {
 	return nil, errors.New("browser login is only supported on Windows")
 }
 

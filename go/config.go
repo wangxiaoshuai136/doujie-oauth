@@ -10,14 +10,16 @@ import (
 )
 
 type config struct {
-	MaxConcurrency int    `yaml:"max_concurrency"`
-	BotID          string `yaml:"bot_id"`
-	DeepThink      bool   `yaml:"deep_think"`
-	Signer         string `yaml:"signer"`
-	SignerURL      string `yaml:"signer_url"`
-	PublicBaseURL  string `yaml:"public_base_url"`
-	AppVersion     string `yaml:"app_version"`
-	Endpoint       string `yaml:"endpoint"`
+	MaxConcurrency  int    `yaml:"max_concurrency"`
+	BotID           string `yaml:"bot_id"`
+	DeepThink       bool   `yaml:"deep_think"`
+	Signer          string `yaml:"signer"`
+	SignerURL       string `yaml:"signer_url"`
+	PublicBaseURL   string `yaml:"public_base_url"`
+	AppVersion      string `yaml:"app_version"`
+	Endpoint        string `yaml:"endpoint"`
+	AutoOpenBrowser bool   `yaml:"auto_open_browser"`
+	Browser         string `yaml:"browser"`
 }
 
 var configMu sync.RWMutex
@@ -25,12 +27,14 @@ var currentConfig = defaults()
 
 func defaults() config {
 	return config{
-		MaxConcurrency: 3,
-		BotID:          defaultBotID,
-		DeepThink:      false,
-		Signer:         "none",
-		AppVersion:     "2.1.7",
-		Endpoint:       "samantha",
+		MaxConcurrency:  3,
+		BotID:           defaultBotID,
+		DeepThink:       false,
+		Signer:          "none",
+		AppVersion:      "2.1.7",
+		Endpoint:        "samantha",
+		AutoOpenBrowser: true,
+		Browser:         "auto",
 	}
 }
 
@@ -83,6 +87,17 @@ func configure(raw []byte) error {
 	c.AppVersion = strings.TrimSpace(c.AppVersion)
 	if c.AppVersion == "" {
 		return fmt.Errorf("invalid doubao plugin configuration: app_version must not be empty")
+	}
+	c.Browser = strings.ToLower(strings.TrimSpace(c.Browser))
+	if c.Browser == "" {
+		c.Browser = "auto"
+	}
+	switch c.Browser {
+	case "auto", "default", "chrome", "google chrome", "edge", "microsoft edge":
+	default:
+		if !strings.ContainsAny(c.Browser, `\/:`) {
+			return fmt.Errorf("invalid doubao plugin configuration: browser must be auto, chrome, edge, or an executable path")
+		}
 	}
 	configMu.Lock()
 	currentConfig = c

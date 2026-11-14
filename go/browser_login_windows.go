@@ -85,6 +85,10 @@ type cdpError struct {
 // service in session 0 it uses the active console user's profile and token so
 // both the default-browser choice and the window belong to that user.
 func startBrowserLogin(site string) (*browserLogin, error) {
+	return startBrowserLoginWithBrowser(site, "auto")
+}
+
+func startBrowserLoginWithBrowser(site, browser string) (*browserLogin, error) {
 	site = normalizeSite(site)
 	port, err := freeLoopbackPort()
 	if err != nil {
@@ -100,7 +104,7 @@ func startBrowserLogin(site string) (*browserLogin, error) {
 			return nil, fmt.Errorf("locate the active desktop user: %w", err)
 		}
 		profile = consoleProfile
-		browserPath, err = resolveBrowserExecutableForUser(profile, consoleToken)
+		browserPath, err = resolveBrowserExecutableForUser(profile, consoleToken, browser)
 		if err != nil {
 			consoleToken.Close()
 			return nil, fmt.Errorf("resolve the desktop user's default browser: %w", err)
@@ -116,7 +120,7 @@ func startBrowserLogin(site string) (*browserLogin, error) {
 		if err != nil {
 			return nil, err
 		}
-		browserPath, err = resolveBrowserExecutable(profile)
+		browserPath, err = resolveBrowserExecutableNamed(profile, browser)
 		if err != nil {
 			return nil, err
 		}
@@ -589,9 +593,9 @@ func mergeEnvironment(base []string, overrides map[string]string) []string {
 	return result
 }
 
-func resolveBrowserExecutableForUser(profile string, token windows.Token) (string, error) {
+func resolveBrowserExecutableForUser(profile string, token windows.Token, browser string) (string, error) {
 	if token == 0 {
-		return resolveBrowserExecutable(profile)
+		return resolveBrowserExecutableNamed(profile, browser)
 	}
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
@@ -600,16 +604,44 @@ func resolveBrowserExecutableForUser(profile string, token windows.Token) (strin
 		return "", fmt.Errorf("ImpersonateLoggedOnUser failed: %v", callErr)
 	}
 	defer procRevertToSelf.Call()
-	return resolveBrowserExecutable(profile)
+	return resolveBrowserExecutableNamed(profile, browser)
 }
 
 func resolveBrowserExecutable(profile string) (string, error) {
+	return resolveBrowserExecutableNamed(profile, "auto")
+}
+
+func resolveBrowserExecutableNamed(profile, browser string) (string, error) {
 	if override := strings.TrimSpace(os.Getenv("DOUJIE_BROWSER_PATH")); override != "" {
 		override = os.ExpandEnv(strings.Trim(override, `"`))
 		if isBrowserExecutable(override) {
 			return filepath.Clean(override), nil
 		}
 		return "", errors.New("DOUJIE_BROWSER_PATH is not an executable file")
+	}
+	preference := strings.ToLower(strings.TrimSpace(browser))
+	switch preference {
+	case "", "auto", "default":
+	case "chrome", "google chrome":
+		for _, candidate := range browserExecutableCandidates(profile, os.Getenv) {
+			if isBrowserExecutable(candidate) {
+				return candidate, nil
+			}
+		}
+		return "", errors.New("Google Chrome is not installed")
+	case "edge", "microsoft edge":
+		for _, candidate := range edgeExecutableCandidates(profile, os.Getenv) {
+			if isBrowserExecutable(candidate) {
+				return candidate, nil
+			}
+		}
+		return "", errors.New("Microsoft Edge is not installed")
+	default:
+		path := filepath.Clean(os.ExpandEnv(strings.Trim(preference, `"`)))
+		if isBrowserExecutable(path) {
+			return path, nil
+		}
+		return "", errors.New("configured browser path is not an executable file")
 	}
 	if defaultPath, defaultErr := defaultBrowserExecutable(); defaultErr == nil && isChromiumBrowser(defaultPath) && isBrowserExecutable(defaultPath) {
 		return defaultPath, nil
@@ -701,6 +733,36 @@ func browserExecutableCandidates(profile string, getenv func(string) string) []s
 	seen := map[string]bool{}
 	unique := make([]string, 0, len(candidates))
 	for _, candidate := range candidates {
+		candidate = filepath.Clean(candidate)
+		key := strings.ToLower(candidate)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		unique = append(unique, candidate)
+	}
+	return unique
+}
+
+func edgeExecutableCandidates(profile string, getenv func(string) string) []string {
+	if getenv == nil {
+		getenv = os.Getenv
+	}
+	var roots []string
+	for _, name := range []string{"ProgramFiles", "ProgramFiles(x86)", "ProgramW6432"} {
+		if dir := strings.TrimSpace(getenv(name)); dir != "" {
+			roots = append(roots, filepath.Join(dir, "Microsoft", "Edge", "Application", "msedge.exe"))
+		}
+	}
+	if dir := strings.TrimSpace(getenv("LOCALAPPDATA")); dir != "" {
+		roots = append(roots, filepath.Join(dir, "Microsoft", "Edge", "Application", "msedge.exe"))
+	}
+	if strings.TrimSpace(profile) != "" {
+		roots = append(roots, filepath.Join(profile, "AppData", "Local", "Microsoft", "Edge", "Application", "msedge.exe"))
+	}
+	seen := map[string]bool{}
+	unique := make([]string, 0, len(roots))
+	for _, candidate := range roots {
 		candidate = filepath.Clean(candidate)
 		key := strings.ToLower(candidate)
 		if seen[key] {

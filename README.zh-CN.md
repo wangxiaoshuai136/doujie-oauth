@@ -194,6 +194,8 @@ plugins:
 | `max_concurrency` | 整数 | `3` | 每凭证 1–100 个并发请求 |
 | `public_base_url` | 字符串 | 空 | 面板未传基础地址时用于拼接静态登录结果页地址 |
 | `app_version` | 字符串 | `2.1.7` | 国内客户端版本标识 |
+| `auto_open_browser` | 布尔 | `true` | 是否自动打开独立浏览器；`false` 时改为返回扫码登录 |
+| `browser` | 字符串 | `auto` | `auto`、`chrome`、`edge`，或浏览器可执行文件绝对路径 |
 
 ## 开发
 
