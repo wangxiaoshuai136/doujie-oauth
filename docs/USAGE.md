@@ -102,6 +102,11 @@ Rules:
 - Session cookies, authorization headers and CSRF tokens are never sent to the
   signer. Only `Content-Type`, `Accept`, `User-Agent` and `Agw-Js-Conv` are
   forwarded.
+- Cookie-derived query parameters such as `msToken`, `sessionid`, `sid_*` and
+  passport CSRF tokens are stripped from the URL before it is sent to the signer
+  and before the upstream request. The Cookie header remains local to the plugin.
+- The full request body is still forwarded to the signer and may contain private
+  prompts. Only configure a signer you trust; use `signer: none` otherwise.
 - `signer_url` must use HTTPS, or plain HTTP only when the host is loopback
   (`127.0.0.1`, `::1`, `localhost`).
 - `Host`, `Content-Length`, `Connection` and `Cookie` are managed by the plugin

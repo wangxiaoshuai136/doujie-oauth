@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
@@ -39,7 +40,8 @@ func (s externalSigner) Sign(req pluginapi.HTTPRequest, sender httpSender) (plug
 	if !trustedSignerURL(s.url) {
 		return req, errors.New("signer URL is not trusted")
 	}
-	payload, err := json.Marshal(signRequest{Method: req.Method, URL: req.URL, Headers: safeSignerHeaders(req.Headers), Body: string(req.Body)})
+	safeURL := sanitizeSignerURL(req.URL)
+	payload, err := json.Marshal(signRequest{Method: req.Method, URL: safeURL, Headers: safeSignerHeaders(req.Headers), Body: string(req.Body)})
 	if err != nil {
 		return req, errors.New("cannot encode signer request")
 	}
@@ -74,7 +76,33 @@ func (s externalSigner) Sign(req pluginapi.HTTPRequest, sender httpSender) (plug
 		headers.Set(name, value)
 	}
 	req.Headers = headers
+	req.URL = safeURL
 	return req, nil
+}
+
+// sanitizeSignerURL removes cookie-derived credentials from query parameters.
+// The values stay in the Cookie header, which is never sent to the signer.
+func sanitizeSignerURL(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return raw
+	}
+	query := u.Query()
+	for _, key := range []string{
+		"msToken",
+		"sessionid",
+		"sessionid_ss",
+		"sid_guard",
+		"sid_tt",
+		"sid_ucp_v1",
+		"ssid_ucp_v1",
+		"passport_csrf_token",
+		"passport_csrf_token_default",
+	} {
+		query.Del(key)
+	}
+	u.RawQuery = query.Encode()
+	return u.String()
 }
 
 // safeSignerHeaders forwards only the target request metadata a signer needs.

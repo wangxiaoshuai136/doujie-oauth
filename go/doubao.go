@@ -146,9 +146,6 @@ func securityParams(c credential, model string) url.Values {
 	params.Set("use-olympus-account", "1")
 	params.Set("fp", c.FP)
 	params.Set("web_tab_id", randomUUID())
-	if token := strings.TrimSpace(c.Cookies["msToken"]); token != "" {
-		params.Set("msToken", token)
-	}
 	return params
 }
 

@@ -60,7 +60,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          version="0.2.3"
+          version="0.2.4"
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             version="${GITHUB_REF_NAME#v}"
           fi
@@ -107,6 +107,7 @@ jobs:
     needs: build
     runs-on: ubuntu-24.04
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: dist
@@ -123,10 +124,28 @@ jobs:
           ls -l dist
           test -n "$(ls dist/*.zip 2>/dev/null)"
           test -s dist/checksums.txt
+      - name: Extract user-readable release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          awk -v prefix="## ${version}" '
+            $0 ~ "^" prefix {found=1; next}
+            found && /^## / {exit}
+            found {print}
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "CHANGELOG.md must contain a ## ${version} section" >&2
+            exit 1
+          fi
+          if [ "$(wc -c < release-notes.md)" -lt 80 ]; then
+            echo "Release notes for ${version} are too short; write for users" >&2
+            exit 1
+          fi
       - uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/*.zip
             dist/checksums.txt
-          generate_release_notes: true
+          body_path: release-notes.md
 

@@ -95,8 +95,11 @@ func TestBuildRequest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if plan.HTTP.Method != http.MethodPost || !strings.Contains(plan.HTTP.URL, "/samantha/chat/completion?") || !strings.Contains(plan.HTTP.URL, "aid=582478") || !strings.Contains(plan.HTTP.URL, "msToken=m") {
+	if plan.HTTP.Method != http.MethodPost || !strings.Contains(plan.HTTP.URL, "/samantha/chat/completion?") || !strings.Contains(plan.HTTP.URL, "aid=582478") {
 		t.Fatalf("unexpected URL: %s", plan.HTTP.URL)
+	}
+	if strings.Contains(plan.HTTP.URL, "msToken") {
+		t.Fatalf("cookie token must not be duplicated in the URL: %s", plan.HTTP.URL)
 	}
 	if plan.HTTP.Headers.Get("Cookie") != "msToken=m; sessionid=s" {
 		t.Fatalf("unexpected cookie header: %q", plan.HTTP.Headers.Get("Cookie"))
@@ -106,6 +109,47 @@ func TestBuildRequest(t *testing.T) {
 	}
 	if !strings.Contains(string(plan.HTTP.Body), "你好") || !strings.Contains(string(plan.HTTP.Body), "bot_id") {
 		t.Fatalf("unexpected body: %s", plan.HTTP.Body)
+	}
+}
+
+func TestExternalSignerDoesNotReceiveCookieQueryToken(t *testing.T) {
+	if err := configure([]byte("signer: external\nsigner_url: http://127.0.0.1:8787/sign")); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = configure(nil) }()
+	sender := &fakeSender{response: pluginapi.HTTPResponse{StatusCode: 200, Body: []byte(`{"headers":{"X-Bogus":"sig"}}`)}}
+	c := credential{
+		Type:     credentialProvider,
+		Cookies:  map[string]string{"sessionid": "s", "msToken": "ms-secret-token"},
+		DeviceID: "7000000000000000",
+		WebID:    "7600000000000000000",
+		FP:       "verify_x",
+	}
+	storage, _ := json.Marshal(c)
+	payload := []byte(`{"model":"doubao","messages":[{"role":"user","content":"hello"}]}`)
+	plan, err := buildRequest(pluginapi.ExecutorRequest{Payload: payload, Model: "doubao", StorageJSON: storage}, sender)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sender.calls != 1 {
+		t.Fatalf("signer calls = %d", sender.calls)
+	}
+	forwarded := string(sender.lastReq.Body)
+	if strings.Contains(forwarded, "ms-secret-token") || strings.Contains(forwarded, "msToken") {
+		t.Fatalf("signer payload leaked the msToken: %s", forwarded)
+	}
+	if strings.Contains(plan.HTTP.URL, "msToken") {
+		t.Fatalf("upstream URL still contains msToken: %s", plan.HTTP.URL)
+	}
+	if !strings.Contains(plan.HTTP.Headers.Get("Cookie"), "msToken=ms-secret-token") {
+		t.Fatalf("cookie token should remain in the Cookie header: %q", plan.HTTP.Headers.Get("Cookie"))
+	}
+}
+
+func TestSanitizeSignerURLRemovesCredentialParams(t *testing.T) {
+	got := sanitizeSignerURL("https://www.doubao.com/chat?aid=1&msToken=secret&sessionid=s&fp=x")
+	if strings.Contains(got, "msToken") || strings.Contains(got, "sessionid") || !strings.Contains(got, "aid=1") || !strings.Contains(got, "fp=x") {
+		t.Fatalf("sanitizeSignerURL = %s", got)
 	}
 }
 

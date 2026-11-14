@@ -42,3 +42,11 @@ Use imperative mood, one logical change per commit, e.g.:
 add Responses API reasoning summary events
 fix QR flow expiry handling
 ```
+
+## Releases
+
+Every release must include a user-readable changelog. Add a `## x.y.z — date`
+section to `CHANGELOG.md` explaining what changed, whether behavior changed, and
+whether users must upgrade, reconfigure, or sign in again. The release workflow
+uses that section as the GitHub release body and fails when it is missing or too
+short. See `docs/RELEASE.md` for the full checklist.
