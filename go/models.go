@@ -26,6 +26,61 @@ type modelSelection struct {
 	ExtraParams      map[string]any
 }
 
+const defaultModelPrefix = "doujie/"
+
+func normalizeModelPrefix(value string) string {
+	value = strings.TrimSpace(value)
+	switch strings.ToLower(value) {
+	case "", "none", "-", "off":
+		return ""
+	}
+	if !strings.HasSuffix(value, "/") {
+		value += "/"
+	}
+	return value
+}
+
+func configuredModelPrefix() string {
+	return normalizeModelPrefix(getConfig().ModelPrefix)
+}
+
+func prefixedModelID(id string) string {
+	id = strings.TrimSpace(id)
+	prefix := configuredModelPrefix()
+	if prefix == "" {
+		return id
+	}
+	return prefix + id
+}
+
+func splitModelAndEffort(model string) (string, string) {
+	model = strings.TrimSpace(model)
+	open := strings.LastIndex(model, "(")
+	if open > 0 && strings.HasSuffix(model, ")") {
+		effort := strings.TrimSpace(model[open+1 : len(model)-1])
+		if effort != "" {
+			return strings.TrimSpace(model[:open]), effort
+		}
+	}
+	return model, ""
+}
+
+func cleanModelID(model string) string {
+	model, _ = splitModelAndEffort(model)
+	model = strings.TrimSpace(model)
+	if model == "" {
+		return ""
+	}
+	lower := strings.ToLower(model)
+	for _, prefix := range []string{configuredModelPrefix(), "doujie/", "doubao/"} {
+		prefix = strings.ToLower(prefix)
+		if prefix != "" && strings.HasPrefix(lower, prefix) {
+			return strings.TrimSpace(model[len(prefix):])
+		}
+	}
+	return model
+}
+
 // isWorkMode reports whether the selection belongs to the MOA work-task menu
 // (mode_id=3, agent_mode=1) rather than the ordinary chat menu.
 func (s modelSelection) isWorkMode() bool {
@@ -66,7 +121,7 @@ var doubaoModels = []modelSpec{
 }
 
 func selectionForModel(model string) (modelSelection, bool) {
-	switch strings.ToLower(strings.TrimSpace(model)) {
+	switch strings.ToLower(cleanModelID(model)) {
 	case "doubao":
 		return modelSelection{
 			ItemKey:          "9",
@@ -218,11 +273,11 @@ func staticModels() []pluginapi.ModelInfo {
 			inputLimit = spec.Context
 		}
 		out = append(out, pluginapi.ModelInfo{
-			ID:                         spec.ID,
+			ID:                         prefixedModelID(spec.ID),
 			Object:                     "model",
 			OwnedBy:                    credentialProvider,
 			Type:                       credentialProvider,
-			Name:                       spec.ID,
+			Name:                       prefixedModelID(spec.ID),
 			DisplayName:                spec.Display,
 			ContextLength:              spec.Context,
 			InputTokenLimit:            inputLimit,
@@ -247,7 +302,7 @@ func modelsForCredential(c credential) []pluginapi.ModelInfo {
 	}
 	filtered := make([]pluginapi.ModelInfo, 0, 1)
 	for _, model := range models {
-		if model.ID == "doubao" {
+		if cleanModelID(model.ID) == "doubao" {
 			filtered = append(filtered, model)
 		}
 	}
@@ -255,6 +310,6 @@ func modelsForCredential(c credential) []pluginapi.ModelInfo {
 }
 
 func wantsDeepThink(model string) bool {
-	model = strings.ToLower(model)
+	model = strings.ToLower(cleanModelID(model))
 	return strings.Contains(model, "think") || strings.Contains(model, "reason")
 }

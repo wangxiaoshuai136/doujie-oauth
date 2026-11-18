@@ -85,6 +85,8 @@ OAuth 发起和轮询使用 CPA 原生受认证管理 API，公共插件资源�
 
 ## 支持模型
 
+默认模型 ID 带 `doujie/` 前缀（例如 `doujie/glm-5.3-flash`），用于和其他供应商的同名模型区分；下表省略前缀。前缀可通过 `model_prefix` 修改，设为 `none` 关闭。执行器仍兼容无前缀和旧 `doubao/` 前缀的请求。
+
 | Model ID | 显示名称 | 上下文 / 输出 |
 | --- | --- | --- |
 | `doubao` | 豆姐 Auto | 256k / 32k |
@@ -135,7 +137,7 @@ DeepSeek 和 GLM 的网关键带 `person-` 前缀，Kimi 使用 `kimi-` 前缀�
 
 ```json
 {
-  "model": "seedance-2.0",
+  "model": "doujie/seedance-2.0",
   "confirm": true,
   "messages": [{"role": "user", "content": "海边日落，镜头缓慢推进"}]
 }
@@ -228,6 +230,7 @@ plugins:
 | `sandbox_auth_type` | 枚举 | `ask_risky` | `ask_always`、`ask_risky`、`always_allow` |
 | `local_app_id` | 字符串 | 聊天 app id | 覆盖本地任务使用的 app id |
 | `client_os` | 枚举 | `Windows` | 本地桌面设备系统：`Windows`、`macOS`、`Linux` |
+| `model_prefix` | 字符串 | `doujie/` | 暴露给客户端的模型 ID 前缀；设为 `none` 关闭 |
 
 ## 开发
 

@@ -100,6 +100,8 @@ The plugin needs no local callback listener and no separate browser process.
 
 ## Supported models
 
+Advertised model IDs carry a `doujie/` prefix by default (for example `doujie/glm-5.3-flash`) so they do not collide with same-named models from other providers; the table below omits the prefix. Change it with `model_prefix`, or set it to `none` to disable. The executor still accepts unprefixed IDs and the legacy `doubao/` prefix.
+
 | Model ID | Display name | Context / output |
 | --- | --- | --- |
 | `doubao` | 豆姐 Auto | 256k / 32k |
@@ -156,7 +158,7 @@ response.
 
 ```json
 {
-  "model": "seedance-2.0",
+  "model": "doujie/seedance-2.0",
   "confirm": true,
   "messages": [{"role": "user", "content": "A sunset over the sea, slow dolly in."}]
 }
@@ -257,6 +259,7 @@ Releases are created by GitHub Actions whenever a `v*` tag is pushed.
 | `sandbox_auth_type` | enum | `ask_risky` | `ask_always`, `ask_risky`, `always_allow` |
 | `local_app_id` | string | chat app id | Override the app id used for local tasks |
 | `client_os` | enum | `Windows` | `Windows`, `macOS`, `Linux` for the local desktop device |
+| `model_prefix` | string | `doujie/` | Prefix for model IDs exposed to clients; set to `none` to disable |
 
 ## Development
 

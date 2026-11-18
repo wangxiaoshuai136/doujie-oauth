@@ -65,14 +65,20 @@ func buildRequest(req pluginapi.ExecutorRequest, sender httpSender) (preparedReq
 	if model == "" {
 		model = "doubao"
 	}
+	requestedModel := model
+	baseModel := cleanModelID(model)
+	if baseModel == "" {
+		baseModel = "doubao"
+		requestedModel = baseModel
+	}
 	prompt, chars, requestDeep, err := extractPrompt(format, req.Payload)
 	if err != nil {
 		return out, pluginabi.NewError("invalid_request", err.Error(), 400)
 	}
 	cfg := getConfig()
 	profile := c.profile()
-	deep := cfg.DeepThink || wantsDeepThink(model) || requestDeep
-	selection, hasSelection := selectionForModel(model)
+	deep := cfg.DeepThink || wantsDeepThink(baseModel) || requestDeep
+	selection, hasSelection := selectionForModel(baseModel)
 	if c.site() != siteCN {
 		hasSelection = false
 	}
@@ -86,7 +92,7 @@ func buildRequest(req pluginapi.ExecutorRequest, sender httpSender) (preparedReq
 			deep = true
 		}
 	}
-	if cfg.DeepThink || wantsDeepThink(model) || requestDeep {
+	if cfg.DeepThink || wantsDeepThink(baseModel) || requestDeep {
 		if deepValue == "0" || deepValue == "" {
 			deepValue = "1"
 		}
@@ -96,7 +102,7 @@ func buildRequest(req pluginapi.ExecutorRequest, sender httpSender) (preparedReq
 	if hasSelection {
 		selected = &selection
 	}
-	params := securityParams(c, model)
+	params := securityParams(c, baseModel)
 	endpoint := cfg.Endpoint
 	if hasSelection {
 		endpoint = "chat"
@@ -107,10 +113,10 @@ func buildRequest(req pluginapi.ExecutorRequest, sender httpSender) (preparedReq
 	var sent map[string]any
 	if endpoint == "chat" {
 		path = "/chat/completion?"
-		sent = chatCompletionPayload(prompt, c.botIDForModel(model), c, selected, deepValue)
+		sent = chatCompletionPayload(prompt, c.botIDForModel(baseModel), c, selected, deepValue)
 	} else {
 		path = "/samantha/chat/completion?"
-		sent = samanthaPayload(prompt, deep, c.botIDForModel(model), selected, deepValue)
+		sent = samanthaPayload(prompt, deep, c.botIDForModel(baseModel), selected, deepValue)
 	}
 	target := profile.Root + path + params.Encode()
 	raw, err := json.Marshal(sent)
@@ -143,7 +149,7 @@ func buildRequest(req pluginapi.ExecutorRequest, sender httpSender) (preparedReq
 			return out, pluginabi.NewError("signer_error", err.Error(), 503)
 		}
 	}
-	return preparedRequest{HTTP: httpReq, Model: model, AuthID: req.AuthID, DeepThink: deep, InputChars: chars, Endpoint: endpoint, Format: format}, nil
+	return preparedRequest{HTTP: httpReq, Model: requestedModel, AuthID: req.AuthID, DeepThink: deep, InputChars: chars, Endpoint: endpoint, Format: format}, nil
 }
 
 func securityParams(c credential, model string) url.Values {

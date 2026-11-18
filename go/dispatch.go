@@ -8,7 +8,7 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
 )
 
-var pluginVersion = "0.2.9"
+var pluginVersion = "0.2.10"
 
 type rpcAuthStart struct {
 	pluginapi.AuthLoginStartRequest
@@ -77,6 +77,7 @@ func registration() any {
 				{Name: "sandbox_auth_type", Type: pluginapi.ConfigFieldTypeEnum, EnumValues: []string{"ask_always", "ask_risky", "always_allow"}, Description: "Local sandbox permission policy: ask_always, ask_risky (default), or always_allow."},
 				{Name: "local_app_id", Type: pluginapi.ConfigFieldTypeString, Description: "Override the Doubao app id used for local tasks. Defaults to the domestic chat app id."},
 				{Name: "client_os", Type: pluginapi.ConfigFieldTypeEnum, EnumValues: []string{"Windows", "macOS", "Linux"}, Description: "Operating system reported for the local desktop device. Defaults to Windows."},
+				{Name: "model_prefix", Type: pluginapi.ConfigFieldTypeString, Description: "Model ID prefix exposed to clients. Defaults to doujie/. Use none to disable."},
 			},
 		},
 		"capabilities": map[string]any{

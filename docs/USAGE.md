@@ -19,6 +19,7 @@ plugins:
       # workspace: D:\WenPaul\Documents
       # sandbox_auth_type: ask_risky
       # client_os: Windows
+      # model_prefix: doujie/
       # public_base_url: https://cpa.example.com
 ```
 
@@ -31,6 +32,10 @@ the previous cloud-computer behavior; `local` creates a local-computer task
 using `workspace`, the imported desktop device id, and the configured
 `sandbox_auth_type`; `auto` picks local when `workspace` is set and cloud
 otherwise. Ordinary chat models do not create work-mode tasks at all.
+
+`model_prefix` controls the model IDs advertised by `/v1/models`; it defaults to
+`doujie/`. Set it to `none` to disable the prefix. Requests using unprefixed IDs
+or the legacy `doubao/` prefix are still accepted.
 
 ## 2. Authentication
 
@@ -154,8 +159,10 @@ Token counts are estimated where upstream streaming chunks do not supply usage t
 
 ## 5.1 Video Models
 
-The plugin advertises `doubao-video`, `seedance-2.5`, `seedance-2.0`,
-`seedance-2.0-fast`, and `seedance-2.0-mini`. Use a normal Chat Completions
+The plugin advertises `doujie/doubao-video`, `doujie/seedance-2.5`,
+`doujie/seedance-2.0`, `doujie/seedance-2.0-fast`, and
+`doujie/seedance-2.0-mini` under the default prefix; unprefixed IDs remain
+accepted. Use a normal Chat Completions
 request. The first request returns a short plan; send `"confirm": true` (or a
 follow-up user message such as `确认生成`) to submit exactly one video task. The
 final MP4 URL is returned in the assistant message.

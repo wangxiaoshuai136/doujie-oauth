@@ -26,6 +26,7 @@ type config struct {
 	SandboxAuthType string `yaml:"sandbox_auth_type"`
 	LocalAppID      string `yaml:"local_app_id"`
 	ClientOS        string `yaml:"client_os"`
+	ModelPrefix     string `yaml:"model_prefix"`
 }
 
 var configMu sync.RWMutex
@@ -44,6 +45,7 @@ func defaults() config {
 		Runtime:         "auto",
 		SandboxAuthType: "ask_risky",
 		ClientOS:        "Windows",
+		ModelPrefix:     defaultModelPrefix,
 	}
 }
 
@@ -133,6 +135,10 @@ func configure(raw []byte) error {
 		c.ClientOS = "Linux"
 	default:
 		return fmt.Errorf("invalid doubao plugin configuration: client_os must be Windows, macOS, or Linux")
+	}
+	c.ModelPrefix = normalizeModelPrefix(c.ModelPrefix)
+	if strings.ContainsAny(c.ModelPrefix, " \t\r\n") {
+		return fmt.Errorf("invalid doubao plugin configuration: model_prefix must not contain whitespace")
 	}
 	c.SandboxAuthType = strings.ToLower(strings.TrimSpace(c.SandboxAuthType))
 	switch c.SandboxAuthType {

@@ -68,7 +68,7 @@ var fallbackVideoModelValues = map[string]string{
 }
 
 func isVideoModel(model string) bool {
-	model = strings.ToLower(strings.TrimSpace(model))
+	model = strings.ToLower(cleanModelID(model))
 	if model == "doubao-video" || model == "doubao-creative-video" || model == "doubao-session-video" {
 		return true
 	}
@@ -78,8 +78,16 @@ func isVideoModel(model string) bool {
 	return strings.HasPrefix(model, "seedance-") || strings.HasPrefix(model, "seedance_")
 }
 
+func videoResponseModel(model string) string {
+	model = strings.TrimSpace(model)
+	if model != "" {
+		return model
+	}
+	return videoModelID
+}
+
 func canonicalVideoModel(model string) string {
-	model = strings.ToLower(strings.TrimSpace(model))
+	model = strings.ToLower(cleanModelID(model))
 	if model == "doubao-session-video" || model == "seedance" || model == "" {
 		return videoModelID
 	}
@@ -1205,11 +1213,11 @@ func executeVideo(req pluginapi.ExecutorRequest, sender httpSender) (pluginapi.E
 		return pluginapi.ExecutorResponse{}, err
 	}
 	return pluginapi.ExecutorResponse{
-		Payload: encodeMessage(formatOf(req), canonicalVideoModel(req.Model), text, ""),
+		Payload: encodeMessage(formatOf(req), videoResponseModel(req.Model), text, ""),
 		Headers: http.Header{"Content-Type": {"application/json"}},
 		Metadata: map[string]any{
 			"upstream_host":  "www.doubao.com",
-			"upstream_model": canonicalVideoModel(req.Model),
+			"upstream_model": videoResponseModel(req.Model),
 			"agent_mode":     true,
 			"plan":           result.Plan,
 			"task_id":        result.TaskID,
@@ -1223,7 +1231,7 @@ func executeVideoStream(req pluginapi.ExecutorRequest, callbackID, streamID stri
 		return nil, pluginabi.NewError("invalid_request", "stream ID required", http.StatusBadRequest)
 	}
 	release := acquire(req.AuthID)
-	stream := newStreamEncoder(formatOf(req), canonicalVideoModel(req.Model), dataFramedChunks(req))
+	stream := newStreamEncoder(formatOf(req), videoResponseModel(req.Model), dataFramedChunks(req))
 	go func() {
 		defer release()
 		emit := func(frames [][]byte) bool {
