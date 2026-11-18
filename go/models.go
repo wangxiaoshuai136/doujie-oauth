@@ -100,9 +100,9 @@ var doubaoModels = []modelSpec{
 	{ID: "doubao-2.1-pro", Display: "豆姐 2.1 Pro", Context: 256000, Output: 32000},
 	{ID: "deepseek-v4.1-flash", Display: "DeepSeek V4.1 Flash", Context: 300000, Output: 32000},
 	{ID: "deepseek-v4-pro", Display: "DeepSeek V4 Pro", Context: 300000, Output: 32000},
-	{ID: "kimi-k3.1-pro", Display: "Kimi K3.1 Pro", Context: 256000, Output: 32000},
-	{ID: "kimi-k3.1-pro-high-speed", Display: "Kimi K3.1 Pro 高速", Context: 256000, Output: 32000},
-	{ID: "kimi-k3", Display: "Kimi K3", Context: 256000, Output: 32000},
+	{ID: "kimi-k3.1-pro", Display: "Kimi K3.1 Pro", Context: 300000, Output: 32000},
+	{ID: "kimi-k3.1-pro-high-speed", Display: "Kimi K3.1 Pro 高速", Context: 300000, Output: 32000},
+	{ID: "kimi-k3", Display: "Kimi K3", Context: 300000, Output: 32000},
 	{ID: "glm-5.3", Display: "GLM 5.3", Context: 300000, Output: 32000},
 	{ID: "glm-5.3-flash", Display: "GLM 5.3 Flash", Context: 300000, Output: 32000},
 	{

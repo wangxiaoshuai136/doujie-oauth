@@ -152,3 +152,34 @@ func TestVideoResponseModelEchoesRequest(t *testing.T) {
 		t.Fatalf("empty video response model = %q", got)
 	}
 }
+func TestThirdPartyModelsUseWorkWindowContext(t *testing.T) {
+	if err := configure(nil); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = configure(nil) }()
+	ids := []string{
+		"deepseek-v4.1-flash",
+		"deepseek-v4-pro",
+		"kimi-k3.1-pro",
+		"kimi-k3.1-pro-high-speed",
+		"kimi-k3",
+		"glm-5.3",
+		"glm-5.3-flash",
+	}
+	byID := map[string]int64{}
+	for _, model := range staticModels() {
+		byID[cleanModelID(model.ID)] = model.ContextLength
+	}
+	for _, id := range ids {
+		if got := byID[id]; got != 300000 {
+			t.Fatalf("model %q context = %d, want 300000", id, got)
+		}
+		selection, ok := selectionForModel(id)
+		if !ok {
+			t.Fatalf("model %q has no work-mode selection", id)
+		}
+		if window, _ := selection.ExtraParams["total_window_size"].(string); window != "300000" {
+			t.Fatalf("model %q work window = %q", id, window)
+		}
+	}
+}
