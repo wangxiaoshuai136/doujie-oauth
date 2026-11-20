@@ -23,11 +23,14 @@ func TestAutoOpenBrowserPreference(t *testing.T) {
 	if autoOpenBrowser(map[string]any{"auto_open": "false"}) {
 		t.Fatal("metadata false must disable auto-open")
 	}
-	if !autoOpenBrowser(map[string]any{"auto_open": "true"}) {
+	if browserLoginSupported && !autoOpenBrowser(map[string]any{"auto_open": "true"}) {
 		t.Fatal("metadata true must enable auto-open")
 	}
-	if !autoOpenBrowser(map[string]any{"browser": "edge"}) {
+	if browserLoginSupported && !autoOpenBrowser(map[string]any{"browser": "edge"}) {
 		t.Fatal("an explicit browser must enable auto-open")
+	}
+	if !browserLoginSupported && autoOpenBrowser(map[string]any{"browser": "edge"}) {
+		t.Fatal("unsupported platforms must fall back to QR regardless of browser hints")
 	}
 	if autoOpenBrowser(map[string]any{"browser": "none"}) {
 		t.Fatal("browser none must disable auto-open")
@@ -35,8 +38,11 @@ func TestAutoOpenBrowserPreference(t *testing.T) {
 	if err := configure([]byte("auto_open_browser: true")); err != nil {
 		t.Fatal(err)
 	}
-	if !autoOpenBrowser(nil) {
+	if browserLoginSupported && !autoOpenBrowser(nil) {
 		t.Fatal("config must be able to opt in to auto-open")
+	}
+	if !browserLoginSupported && autoOpenBrowser(nil) {
+		t.Fatal("config must not enable browser sign-in on unsupported platforms")
 	}
 	if browserPreference(map[string]any{"browser": "edge"}) != "edge" {
 		t.Fatal("metadata browser must win")

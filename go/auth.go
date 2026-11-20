@@ -642,6 +642,14 @@ func startBrowserAccountLogin(req pluginapi.AuthLoginStartRequest, key []byte, s
 }
 
 func autoOpenBrowser(metadata map[string]any) bool {
+	// Browser sign-in is implemented only on Windows (browser_login_windows.go);
+	// other platforms use the browser_login_other.go stub, which always fails.
+	// Hosts send a generic browser=default / auto_open=auto hint on every
+	// platform, so on non-Windows builds fall back to the portable QR flow
+	// instead of routing into that stub and failing the login request.
+	if !browserLoginSupported {
+		return false
+	}
 	for _, key := range []string{"auto_open", "autoOpen", "open_browser", "openBrowser", "open_browser_url"} {
 		value, ok := metadata[key]
 		if !ok {
