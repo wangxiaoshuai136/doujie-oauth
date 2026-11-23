@@ -84,7 +84,7 @@ func (c credential) botID() string {
 func (c credential) botIDForModel(model string) string {
 	cfg := getConfig()
 	if c.site() == siteCN && cfg.BotID == defaultBotID {
-		if selection, ok := selectionForModel(model); ok && selection.isWorkMode() {
+		if selection, ok := selectionForModelForCredential(c, model); ok && selection.isWorkMode() {
 			return modelSelectionBotID
 		}
 	}

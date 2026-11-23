@@ -8,7 +8,7 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
 )
 
-var pluginVersion = "0.2.12"
+var pluginVersion = "0.2.13"
 
 type rpcAuthStart struct {
 	pluginapi.AuthLoginStartRequest
@@ -182,7 +182,11 @@ func handleMethod(method string, raw []byte) (any, error) {
 		if err != nil {
 			return nil, pluginabi.NewError("invalid_auth", "invalid credential", 401)
 		}
-		return pluginapi.ModelResponse{Provider: credentialProvider, Models: modelsForCredential(c)}, nil
+		models, errModels := modelsForCredential(c, cpaSender{callbackID: req.CallbackID})
+		if errModels != nil {
+			return nil, pluginabi.NewError("model_catalog_error", errModels.Error(), http.StatusBadGateway)
+		}
+		return pluginapi.ModelResponse{Provider: credentialProvider, Models: models}, nil
 	case "executor.execute":
 		var req rpcExecution
 		if err := unmarshal(raw, &req); err != nil {

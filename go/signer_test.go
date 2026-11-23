@@ -90,8 +90,8 @@ func TestBuildRequest(t *testing.T) {
 	}
 	c := credential{Type: credentialProvider, Cookies: map[string]string{"sessionid": "s", "msToken": "m"}, DeviceID: "7000000000000000", WebID: "7600000000000000000", FP: "verify_x"}
 	storage, _ := json.Marshal(c)
-	payload := []byte(`{"model":"doubao-seed-1.6-thinking","messages":[{"role":"user","content":"你好"}]}`)
-	plan, err := buildRequest(pluginapi.ExecutorRequest{Payload: payload, Model: "doubao-seed-1.6-thinking", StorageJSON: storage}, nil)
+	payload := []byte(`{"model":"doubao","messages":[{"role":"user","content":"你好"}]}`)
+	plan, err := buildRequest(pluginapi.ExecutorRequest{Payload: payload, Model: "doubao", StorageJSON: storage}, testCatalogSender())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,18 +119,19 @@ func TestBuildRequestUsesDoubaoModelRoutes(t *testing.T) {
 	c := credential{Type: credentialProvider, Cookies: map[string]string{"sessionid": "s"}, DeviceID: "7000000000000000", WebID: "7600000000000000000", FP: "verify_x"}
 	storage, _ := json.Marshal(c)
 	cases := []struct {
-		model    string
-		key      string
-		deep     string
-		wantDeep int
+		model      string
+		key        string
+		deep       string
+		wantDeep   int
+		wantEffort float64
 	}{
-		{"doubao", "9", "9", 9},
-		{"doubao-pro", "5", "5", 5},
+		{"doubao", "9", "9", 9, 4},
+		{"doubao-pro", "5", "5", 5, 5},
 	}
 	for _, tc := range cases {
 		t.Run(tc.model, func(t *testing.T) {
 			payload := []byte(`{"model":"` + tc.model + `","messages":[{"role":"user","content":"hello"}]}`)
-			plan, err := buildRequest(pluginapi.ExecutorRequest{Payload: payload, Model: tc.model, StorageJSON: storage}, nil)
+			plan, err := buildRequest(pluginapi.ExecutorRequest{Payload: payload, Model: tc.model, StorageJSON: storage}, testCatalogSender())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -163,46 +164,11 @@ func TestBuildRequestUsesDoubaoModelRoutes(t *testing.T) {
 				t.Fatalf("unexpected mode: %#v", body.Option.Aggregate)
 			}
 			params := body.Option.ModelConfig["model_extra_params"].(map[string]any)
-			if body.Option.ModelConfig["reasoning_effort"] != float64(5) || params["total_window_size"] != "256000" {
+			if body.Option.ModelConfig["reasoning_effort"] != tc.wantEffort || params["total_window_size"] != "256000" {
 				t.Fatalf("unexpected effort/params: %#v", body.Option.ModelConfig)
 			}
 			if body.Option.NeedDeepThink != tc.wantDeep || body.Option.AgentMode != 1 {
 				t.Fatalf("unexpected option: %#v", body.Option)
-			}
-		})
-	}
-}
-
-func TestThirdPartyModelSelections(t *testing.T) {
-	cases := []struct {
-		model  string
-		key    string
-		itemID string
-		window string
-	}{
-		{"doubao-2.1-lite", "seed-lite-7b", "10001", "256000"},
-		{"deepseek-v4.1-flash", "person-deepseek-v4-1-flash-261017", "10001", "300000"},
-		{"deepseek-v4-pro", "person-deepseek-v4-pro-ga-260813", "10001", "300000"},
-		{"kimi-k3.1-pro", "person-kimi-k3-1-pro-261111", "10001", "300000"},
-		{"kimi-k3.1-pro-high-speed", "person-kimi-k3-1-pro-highspeed-261111", "10001", "300000"},
-		{"kimi-k3", "person-kimi-k3-261111", "10001", "300000"},
-		{"glm-5.3", "person-glm-5-3-261111", "10001", "300000"},
-		{"glm-5.3-flash", "person-glm-5-3-flash-261111", "10001", "300000"},
-	}
-	for _, tc := range cases {
-		t.Run(tc.model, func(t *testing.T) {
-			selection, ok := selectionForModel(tc.model)
-			if !ok {
-				t.Fatalf("model %q is not selectable", tc.model)
-			}
-			if selection.ItemKey != tc.key || selection.ItemID != tc.itemID {
-				t.Fatalf("unexpected selection: %+v", selection)
-			}
-			if selection.ModeID != "3" || selection.AgentMode != 1 || selection.ConversationMode != "2" || selection.ReasoningEffort != 5 {
-				t.Fatalf("unexpected work-mode routing: %+v", selection)
-			}
-			if selection.ExtraParams["total_window_size"] != tc.window {
-				t.Fatalf("unexpected context params: %#v", selection.ExtraParams)
 			}
 		})
 	}
@@ -216,7 +182,7 @@ func TestChatEndpointCarriesModelConfig(t *testing.T) {
 	c := credential{Type: credentialProvider, Cookies: map[string]string{"sessionid": "s"}, DeviceID: "7000000000000000", WebID: "7600000000000000000", FP: "verify_x"}
 	storage, _ := json.Marshal(c)
 	payload := []byte(`{"model":"doubao-pro","messages":[{"role":"user","content":"hello"}]}`)
-	plan, err := buildRequest(pluginapi.ExecutorRequest{Payload: payload, Model: "doubao-pro", StorageJSON: storage}, nil)
+	plan, err := buildRequest(pluginapi.ExecutorRequest{Payload: payload, Model: "doubao-pro", StorageJSON: storage}, testCatalogSender())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,6 +229,7 @@ func TestExternalSignerDoesNotReceiveCookieQueryToken(t *testing.T) {
 		FP:       "verify_x",
 	}
 	storage, _ := json.Marshal(c)
+	primeCatalogForTest(t, c)
 	payload := []byte(`{"model":"doubao","messages":[{"role":"user","content":"hello"}]}`)
 	plan, err := buildRequest(pluginapi.ExecutorRequest{Payload: payload, Model: "doubao", StorageJSON: storage}, sender)
 	if err != nil {

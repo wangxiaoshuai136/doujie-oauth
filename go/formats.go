@@ -40,7 +40,7 @@ func modelFromPayload(payload []byte) string {
 	return ""
 }
 
-func buildPrompt(system string, turns []promptTurn) (string, int, error) {
+func buildPrompt(system string, turns []promptTurn, maxChars int) (string, int, error) {
 	var parts []string
 	if strings.TrimSpace(system) != "" {
 		parts = append(parts, "System instructions:\n"+system)
@@ -63,7 +63,7 @@ func buildPrompt(system string, turns []promptTurn) (string, int, error) {
 	parts = append(parts, "Reply as the assistant to the final user message.")
 	prompt := strings.Join(parts, "\n\n")
 	chars := utf8.RuneCountInString(prompt)
-	if chars > maxPromptChars {
+	if maxChars > 0 && chars > maxChars {
 		return "", 0, errors.New("prompt exceeds the Doubao web context limit")
 	}
 	return prompt, chars, nil
@@ -89,12 +89,24 @@ type responsesRequest struct {
 	} `json:"reasoning"`
 }
 
+type promptExtraction struct {
+	Prompt string
+	Chars  int
+	Effort string
+	Deep   bool
+}
+
 func extractPrompt(format string, payload []byte) (string, int, bool, error) {
+	result, err := extractPromptRequest(format, payload, 0)
+	return result.Prompt, result.Chars, result.Deep, err
+}
+
+func extractPromptRequest(format string, payload []byte, maxChars int) (promptExtraction, error) {
 	switch format {
 	case "openai":
 		var body openAIChatRequest
 		if json.Unmarshal(payload, &body) != nil {
-			return "", 0, false, errors.New("invalid OpenAI Chat Completions request")
+			return promptExtraction{}, errors.New("invalid OpenAI Chat Completions request")
 		}
 		var system []string
 		var turns []promptTurn
@@ -108,13 +120,13 @@ func extractPrompt(format string, payload []byte) (string, int, bool, error) {
 			}
 			turns = append(turns, promptTurn{Role: message.Role, Text: text})
 		}
-		prompt, chars, err := buildPrompt(strings.Join(system, "\n\n"), turns)
+		prompt, chars, err := buildPrompt(strings.Join(system, "\n\n"), turns, maxChars)
 		deep := reasoningEffortEnabled(body.ReasoningEffort)
-		return prompt, chars, deep, err
+		return promptExtraction{Prompt: prompt, Chars: chars, Effort: body.ReasoningEffort, Deep: deep}, err
 	case "openai-response":
 		var body responsesRequest
 		if json.Unmarshal(payload, &body) != nil {
-			return "", 0, false, errors.New("invalid OpenAI Responses request")
+			return promptExtraction{}, errors.New("invalid OpenAI Responses request")
 		}
 		system := flattenBlocks(body.Instructions)
 		var turns []promptTurn
@@ -135,32 +147,31 @@ func extractPrompt(format string, payload []byte) (string, int, bool, error) {
 				}
 			}
 		}
-		prompt, chars, err := buildPrompt(system, turns)
+		prompt, chars, err := buildPrompt(system, turns, maxChars)
 		deep := body.Reasoning != nil && reasoningEffortEnabled(body.Reasoning.Effort)
-		return prompt, chars, deep, err
+		effort := ""
+		if body.Reasoning != nil {
+			effort = body.Reasoning.Effort
+		}
+		return promptExtraction{Prompt: prompt, Chars: chars, Effort: effort, Deep: deep}, err
 	default:
 		var body anthropicRequest
 		if json.Unmarshal(payload, &body) != nil {
-			return "", 0, false, errors.New("invalid Anthropic Messages request")
+			return promptExtraction{}, errors.New("invalid Anthropic Messages request")
 		}
 		system := flattenBlocks(body.System)
 		var turns []promptTurn
 		for _, message := range body.Messages {
 			turns = append(turns, promptTurn{Role: message.Role, Text: flattenBlocks(message.Content)})
 		}
-		prompt, chars, err := buildPrompt(system, turns)
+		prompt, chars, err := buildPrompt(system, turns, maxChars)
 		deep := body.Thinking != nil && strings.EqualFold(body.Thinking.Type, "enabled")
-		return prompt, chars, deep, err
+		return promptExtraction{Prompt: prompt, Chars: chars, Deep: deep}, err
 	}
 }
 
 func reasoningEffortEnabled(effort string) bool {
-	switch strings.ToLower(strings.TrimSpace(effort)) {
-	case "low", "medium", "high":
-		return true
-	default:
-		return false
-	}
+	return parseEffortLevel(effort) >= 2
 }
 
 func rawText(raw json.RawMessage) (string, bool) {

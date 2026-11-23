@@ -119,6 +119,12 @@ func TestQuotaResetUsesAvailableCard(t *testing.T) {
 	if json.Unmarshal(sender.lastUse, &body) != nil || body["card_key"] != pcResetCardKey || body["use_request_id"] == "" {
 		t.Fatalf("unexpected use payload: %s", sender.lastUse)
 	}
+	if _, ok := body["card_id"]; ok {
+		t.Fatalf("empty card_id must be omitted: %s", sender.lastUse)
+	}
+	if _, ok := body["trigger_scene"]; ok {
+		t.Fatalf("empty trigger_scene must be omitted: %s", sender.lastUse)
+	}
 }
 
 func TestQuotaResetWithoutCard(t *testing.T) {

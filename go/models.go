@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
@@ -23,6 +24,9 @@ type modelSelection struct {
 	ConversationMode string
 	AgentMode        int
 	ReasoningEffort  int
+	Context          int64
+	Efforts          []int
+	DefaultEffort    int
 	ExtraParams      map[string]any
 }
 
@@ -87,24 +91,7 @@ func (s modelSelection) isWorkMode() bool {
 	return s.ModeID == "3" && s.AgentMode == 1
 }
 
-var doubaoModels = []modelSpec{
-	{ID: "doubao", Display: "豆姐 Auto", Context: 256000, Output: 32000},
-	{ID: "doubao-seed-2.0", Display: "豆姐 Seed 2.0", Context: 256000, Output: 32000},
-	{ID: "doubao-seed-2.0-lite", Display: "豆姐 Seed 2.0 Lite", Context: 256000, Output: 32000},
-	{ID: "doubao-seed-2.0-code", Display: "豆姐 Seed 2.0 Code", Context: 256000, Output: 32000},
-	{ID: "doubao-seed-1.6", Display: "豆姐 Seed 1.6", Context: 256000, Output: 32000},
-	{ID: "doubao-seed-1.6-thinking", Display: "豆姐 Seed 1.6 思考", Context: 256000, Output: 32000},
-	{ID: "doubao-seed-1.6-flash", Display: "豆姐 Seed 1.6 Flash", Context: 256000, Output: 32000},
-	{ID: "doubao-pro", Display: "豆姐 Pro", Context: 256000, Output: 32000},
-	{ID: "doubao-2.1-lite", Display: "豆姐 2.1 Lite", Context: 256000, Output: 32000},
-	{ID: "doubao-2.1-pro", Display: "豆姐 2.1 Pro", Context: 256000, Output: 32000},
-	{ID: "deepseek-v4.1-flash", Display: "DeepSeek V4.1 Flash", Context: 300000, Output: 32000},
-	{ID: "deepseek-v4-pro", Display: "DeepSeek V4 Pro", Context: 300000, Output: 32000},
-	{ID: "kimi-k3.1-pro", Display: "Kimi K3.1 Pro", Context: 300000, Output: 32000},
-	{ID: "kimi-k3.1-pro-high-speed", Display: "Kimi K3.1 Pro 高速", Context: 300000, Output: 32000},
-	{ID: "kimi-k3", Display: "Kimi K3", Context: 300000, Output: 32000},
-	{ID: "glm-5.3", Display: "GLM 5.3", Context: 300000, Output: 32000},
-	{ID: "glm-5.3-flash", Display: "GLM 5.3 Flash", Context: 300000, Output: 32000},
+var videoModels = []modelSpec{
 	{
 		ID:          "doubao-video",
 		Display:     "豆姐视频（自动）",
@@ -120,193 +107,72 @@ var doubaoModels = []modelSpec{
 	{ID: "seedance-2.0-mini", Display: "Seedance 2.0 Mini", Description: "Use Seedance 2.0 Mini through the official Doubao video skill.", Context: 8192, Output: 2048, Version: "2.0-mini", Outputs: []string{"text", "video"}},
 }
 
-func selectionForModel(model string) (modelSelection, bool) {
-	switch strings.ToLower(cleanModelID(model)) {
-	case "doubao":
-		return modelSelection{
-			ItemKey:          "9",
-			ItemID:           "9",
-			ModeID:           "3",
-			ConversationMode: "2",
-			AgentMode:        1,
-			ReasoningEffort:  5,
-			ExtraParams:      map[string]any{"total_window_size": "256000"},
-		}, true
-	case "doubao-pro", "doubao-2.1-pro":
-		return modelSelection{
-			ItemKey:          "5",
-			ItemID:           "5",
-			ModeID:           "3",
-			ConversationMode: "2",
-			AgentMode:        1,
-			ReasoningEffort:  5,
-			ExtraParams:      map[string]any{"total_window_size": "256000"},
-		}, true
-	case "doubao-seed-2.0", "doubao-seed-2.0-code":
-		return modelSelection{
-			ItemKey:          "5",
-			ItemID:           "5",
-			ModeID:           "3",
-			ConversationMode: "2",
-			AgentMode:        1,
-			ReasoningEffort:  5,
-			ExtraParams:      map[string]any{"total_window_size": "256000"},
-		}, true
-	case "doubao-seed-2.0-lite", "doubao-2.1-lite":
-		return modelSelection{
-			ItemKey:          "seed-lite-7b",
-			ItemID:           "10001",
-			ModeID:           "3",
-			ConversationMode: "2",
-			AgentMode:        1,
-			ReasoningEffort:  5,
-			ExtraParams:      map[string]any{"memory_profile": "256k", "total_window_size": "256000"},
-		}, true
-	case "deepseek-v4.1-flash", "deepseek-v4-1-flash", "deepseek-v4-flash", "person-deepseek-v4-1-flash-261017":
-		return modelSelection{
-			ItemKey:          "person-deepseek-v4-1-flash-261017",
-			ItemID:           "10001",
-			ModeID:           "3",
-			ConversationMode: "2",
-			AgentMode:        1,
-			ReasoningEffort:  5,
-			ExtraParams:      map[string]any{"memory_profile": "300k_230", "total_window_size": "300000"},
-		}, true
-	case "deepseek-v4-pro", "deepseek-v4.1-pro", "deepseek-v4-1-pro", "deepseek-v4-pro-ga-260813", "person-deepseek-v4-pro-ga-260813":
-		return modelSelection{
-			ItemKey:          "person-deepseek-v4-pro-ga-260813",
-			ItemID:           "10001",
-			ModeID:           "3",
-			ConversationMode: "2",
-			AgentMode:        1,
-			ReasoningEffort:  5,
-			ExtraParams:      map[string]any{"memory_profile": "300k_230", "total_window_size": "300000"},
-		}, true
-	case "kimi-k3.1-pro", "kimi-k3-1-pro", "person-kimi-k3-1-pro-261111":
-		return modelSelection{
-			ItemKey:          "person-kimi-k3-1-pro-261111",
-			ItemID:           "10001",
-			ModeID:           "3",
-			ConversationMode: "2",
-			AgentMode:        1,
-			ReasoningEffort:  5,
-			ExtraParams:      map[string]any{"memory_profile": "300k_230", "total_window_size": "300000"},
-		}, true
-	case "kimi-k3.1-pro-high-speed", "kimi-k3-1-pro-high-speed", "kimi-k3-1-pro-highspeed", "person-kimi-k3-1-pro-highspeed-261111":
-		return modelSelection{
-			ItemKey:          "person-kimi-k3-1-pro-highspeed-261111",
-			ItemID:           "10001",
-			ModeID:           "3",
-			ConversationMode: "2",
-			AgentMode:        1,
-			ReasoningEffort:  5,
-			ExtraParams:      map[string]any{"memory_profile": "300k_230", "total_window_size": "300000"},
-		}, true
-	case "kimi-k3", "person-kimi-k3-261111":
-		return modelSelection{
-			ItemKey:          "person-kimi-k3-261111",
-			ItemID:           "10001",
-			ModeID:           "3",
-			ConversationMode: "2",
-			AgentMode:        1,
-			ReasoningEffort:  5,
-			ExtraParams:      map[string]any{"memory_profile": "300k_230", "total_window_size": "300000"},
-		}, true
-	case "glm-5.3", "glm-5-3", "person-glm-5-3-261111":
-		return modelSelection{
-			ItemKey:          "person-glm-5-3-261111",
-			ItemID:           "10001",
-			ModeID:           "3",
-			ConversationMode: "2",
-			AgentMode:        1,
-			ReasoningEffort:  5,
-			ExtraParams:      map[string]any{"memory_profile": "300k_230", "total_window_size": "300000"},
-		}, true
-	case "glm-5.3-flash", "glm-5-3-flash", "person-glm-5-3-flash-261111":
-		return modelSelection{
-			ItemKey:          "person-glm-5-3-flash-261111",
-			ItemID:           "10001",
-			ModeID:           "3",
-			ConversationMode: "2",
-			AgentMode:        1,
-			ReasoningEffort:  5,
-			ExtraParams:      map[string]any{"memory_profile": "300k_230", "total_window_size": "300000"},
-		}, true
-	case "doubao-seed-1.6", "doubao-seed-1.6-thinking":
-		return modelSelection{
-			ItemKey:          "3",
-			ItemID:           "3",
-			ModeID:           "1",
-			ConversationMode: "1",
-			AgentMode:        2,
-			ReasoningEffort:  4,
-			ExtraParams:      map[string]any{"total_window_size": "128000"},
-		}, true
-	case "doubao-seed-1.6-flash":
-		return modelSelection{
-			ItemKey:          "0",
-			ItemID:           "0",
-			ModeID:           "1",
-			ConversationMode: "1",
-			AgentMode:        2,
-			ReasoningEffort:  3,
-			ExtraParams:      map[string]any{},
-		}, true
-	default:
-		return modelSelection{}, false
+func modelInfoForSpec(spec modelSpec) pluginapi.ModelInfo {
+	var thinking *pluginapi.ThinkingSupport
+	if len(spec.Outputs) == 0 {
+		thinking = thinkingForEfforts(nil, nil)
+	}
+	inputLimit := spec.Context - spec.Output
+	if inputLimit < 1 {
+		inputLimit = spec.Context
+	}
+	return pluginapi.ModelInfo{
+		ID:                         prefixedModelID(spec.ID),
+		Object:                     "model",
+		OwnedBy:                    credentialProvider,
+		Type:                       credentialProvider,
+		Name:                       prefixedModelID(spec.ID),
+		DisplayName:                spec.Display,
+		ContextLength:              spec.Context,
+		InputTokenLimit:            inputLimit,
+		MaxCompletionTokens:        spec.Output,
+		OutputTokenLimit:           spec.Output,
+		Version:                    spec.Version,
+		Description:                spec.Description,
+		SupportedGenerationMethods: []string{"chat"},
+		SupportedInputModalities:   []string{"text"},
+		SupportedOutputModalities:  spec.Outputs,
+		SupportedParameters:        []string{"prompt", "ratio", "seconds", "resolution"},
+		Thinking:                   thinking,
 	}
 }
 
 func staticModels() []pluginapi.ModelInfo {
-	out := make([]pluginapi.ModelInfo, 0, len(doubaoModels))
-	for _, spec := range doubaoModels {
-		var thinking *pluginapi.ThinkingSupport
-		if len(spec.Outputs) == 0 {
-			thinking = &pluginapi.ThinkingSupport{
-				ZeroAllowed:    true,
-				DynamicAllowed: true,
-				Levels:         []string{"low", "medium", "high"},
-			}
-		}
-		inputLimit := spec.Context - spec.Output
-		if inputLimit < 1 {
-			inputLimit = spec.Context
-		}
-		out = append(out, pluginapi.ModelInfo{
-			ID:                         prefixedModelID(spec.ID),
-			Object:                     "model",
-			OwnedBy:                    credentialProvider,
-			Type:                       credentialProvider,
-			Name:                       prefixedModelID(spec.ID),
-			DisplayName:                spec.Display,
-			ContextLength:              spec.Context,
-			InputTokenLimit:            inputLimit,
-			MaxCompletionTokens:        spec.Output,
-			OutputTokenLimit:           spec.Output,
-			Version:                    spec.Version,
-			Description:                spec.Description,
-			SupportedGenerationMethods: []string{"chat"},
-			SupportedInputModalities:   []string{"text"},
-			SupportedOutputModalities:  spec.Outputs,
-			SupportedParameters:        []string{"prompt", "ratio", "seconds", "resolution"},
-			Thinking:                   thinking,
-		})
+	out := make([]pluginapi.ModelInfo, 0, len(videoModels))
+	for _, spec := range videoModels {
+		out = append(out, modelInfoForSpec(spec))
 	}
 	return out
 }
 
-func modelsForCredential(c credential) []pluginapi.ModelInfo {
-	models := staticModels()
-	if c.site() != siteGlobal {
-		return models
+var globalDefaultModel = modelSpec{ID: "doubao", Display: "豆姐 Auto", Context: 256000, Version: "dola"}
+
+func modelsForCredential(c credential, sender httpSender) ([]pluginapi.ModelInfo, error) {
+	if c.site() == siteGlobal {
+		return []pluginapi.ModelInfo{modelInfoForSpec(globalDefaultModel)}, nil
 	}
-	filtered := make([]pluginapi.ModelInfo, 0, 1)
-	for _, model := range models {
-		if cleanModelID(model.ID) == "doubao" {
-			filtered = append(filtered, model)
+
+	specs, err := catalogForCredential(c, sender)
+	if err != nil {
+		return nil, err
+	}
+	if len(specs) == 0 {
+		return nil, fmt.Errorf("model catalog returned no models")
+	}
+	models := make([]pluginapi.ModelInfo, 0, len(specs)+5)
+	seen := map[string]struct{}{}
+	for _, spec := range specs {
+		model := catalogModelInfo(spec)
+		models = append(models, model)
+		seen[cleanModelID(model.ID)] = struct{}{}
+	}
+	for _, spec := range videoModels {
+		if _, exists := seen[spec.ID]; exists {
+			continue
 		}
+		models = append(models, modelInfoForSpec(spec))
 	}
-	return filtered
+	return models, nil
 }
 
 func wantsDeepThink(model string) bool {

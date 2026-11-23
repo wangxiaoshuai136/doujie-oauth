@@ -414,10 +414,10 @@ func quotaReset(req pluginapi.QuotaResetRequest, sender httpSender) (pluginapi.Q
 		return out, err
 	}
 	key := ""
-	if int(balance.Data.AvailableCountByCardKey[pcResetCardKey]) > 0 {
-		key = pcResetCardKey
-	} else if int(balance.Data.AvailableCountByCardKey[resetCardKey]) > 0 {
+	if int(balance.Data.AvailableCountByCardKey[resetCardKey]) > 0 {
 		key = resetCardKey
+	} else if int(balance.Data.AvailableCountByCardKey[pcResetCardKey]) > 0 {
+		key = pcResetCardKey
 	} else if int(balance.Data.AvailableCount) > 0 {
 		key = resetCardKey
 	}
@@ -427,8 +427,6 @@ func quotaReset(req pluginapi.QuotaResetRequest, sender httpSender) (pluginapi.Q
 	body, err := quotaAPIRequest(sender, c, cardUsePath, map[string]any{
 		"card_key":       key,
 		"use_request_id": randomUUID(),
-		"trigger_scene":  "",
-		"card_id":        "",
 	})
 	if err != nil {
 		return out, err

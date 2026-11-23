@@ -87,25 +87,25 @@ OAuth 发起和轮询使用 CPA 原生受认证管理 API，公共插件资源�
 
 默认模型 ID 带 `doujie/` 前缀（例如 `doujie/glm-5.3-flash`），用于和其他供应商的同名模型区分；下表省略前缀。前缀可通过 `model_prefix` 修改，设为 `none` 关闭。执行器仍兼容无前缀和旧 `doubao/` 前缀的请求。
 
-| Model ID | 显示名称 | 上下文 / 输出 |
+实际可用模型以当前账号菜单的动态下发为准；下表是默认与兼容清单，服务端新增模型会自动出现。
+
+| Model ID | 显示名称 | 上下文 / 输出上限 |
 | --- | --- | --- |
-| `doubao` | 豆姐 Auto | 256k / 32k |
-| `doubao-seed-2.0` | 豆姐 Seed 2.0 | 256k / 32k |
-| `doubao-seed-2.0-lite` | 豆姐 Seed 2.0 Lite | 256k / 32k |
-| `doubao-seed-2.0-code` | 豆姐 Seed 2.0 Code | 256k / 32k |
-| `doubao-seed-1.6` | 豆姐 Seed 1.6 | 256k / 32k |
-| `doubao-seed-1.6-thinking` | 豆姐 Seed 1.6 思考 | 256k / 32k |
-| `doubao-seed-1.6-flash` | 豆姐 Seed 1.6 Flash | 256k / 32k |
-| `doubao-pro` | 豆姐 Pro | 256k / 32k |
-| `doubao-2.1-lite` | 豆姐 2.1 Lite | 256k / 32k |
-| `doubao-2.1-pro` | 豆姐 2.1 Pro | 256k / 32k |
-| `deepseek-v4.1-flash` | DeepSeek V4.1 Flash | 300k / 32k |
-| `deepseek-v4-pro` | DeepSeek V4 Pro | 300k / 32k |
-| `kimi-k3.1-pro` | Kimi K3.1 Pro | 256k / 32k |
-| `kimi-k3.1-pro-high-speed` | Kimi K3.1 Pro 高速 | 256k / 32k |
-| `kimi-k3` | Kimi K3 | 256k / 32k |
-| `glm-5.3` | GLM 5.3 | 300k / 32k |
-| `glm-5.3-flash` | GLM 5.3 Flash | 300k / 32k |
+| `doubao` | 豆姐 Auto | 256k / 未下发 |
+| `doubao-seed-2.0-lite` | 豆姐 Seed 2.0 Lite | 256k / 未下发 |
+| `doubao-seed-1.6` | 豆姐 Seed 1.6 | 256k / 未下发 |
+| `doubao-seed-1.6-flash` | 豆姐 Seed 1.6 Flash | 256k / 未下发 |
+| `doubao-pro` | 豆姐 Pro | 256k / 未下发 |
+| `deepseek-v4.1-flash` | DeepSeek V4.1 Flash | 300k / 未下发 |
+| `deepseek-v4-pro` | DeepSeek V4 Pro | 300k / 未下发 |
+| `kimi-k3.1-pro` | Kimi K3.1 Pro | 300k / 未下发 |
+| `kimi-k3.1-pro-high-speed` | Kimi K3.1 Pro 高速 | 300k / 未下发 |
+| `kimi-k3` | Kimi K3 | 300k / 未下发 |
+| `glm-5.3` | GLM 5.3 | 300k / 未下发 |
+| `glm-5.3-flash` | GLM 5.3 Flash | 300k / 未下发 |
+| `qwen4-max` | Qwen 4 Max | 300k / 未下发 |
+| `qwen3-8-max` | Qwen 3.8 Max | 300k / 未下发 |
+| `qwen3-8-flash` | Qwen 3.8 Flash | 300k / 未下发 |
 | `doubao-video` | 豆姐视频（自动） | 8k / 2k |
 | `seedance-2.5` | Seedance 2.5 | 8k / 2k |
 | `seedance-2.0` | Seedance 2.0 | 8k / 2k |

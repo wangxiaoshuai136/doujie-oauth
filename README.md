@@ -102,25 +102,25 @@ The plugin needs no local callback listener and no separate browser process.
 
 Advertised model IDs carry a `doujie/` prefix by default (for example `doujie/glm-5.3-flash`) so they do not collide with same-named models from other providers; the table below omits the prefix. Change it with `model_prefix`, or set it to `none` to disable. The executor still accepts unprefixed IDs and the legacy `doubao/` prefix.
 
-| Model ID | Display name | Context / output |
+The live model list is discovered from the signed-in account menu. The table below is the default and compatibility set; newly published server models appear automatically.
+
+| Model ID | Display name | Context / output limit |
 | --- | --- | --- |
-| `doubao` | 豆姐 Auto | 256k / 32k |
-| `doubao-seed-2.0` | 豆姐 Seed 2.0 | 256k / 32k |
-| `doubao-seed-2.0-lite` | 豆姐 Seed 2.0 Lite | 256k / 32k |
-| `doubao-seed-2.0-code` | 豆姐 Seed 2.0 Code | 256k / 32k |
-| `doubao-seed-1.6` | 豆姐 Seed 1.6 | 256k / 32k |
-| `doubao-seed-1.6-thinking` | 豆姐 Seed 1.6 思考 | 256k / 32k |
-| `doubao-seed-1.6-flash` | 豆姐 Seed 1.6 Flash | 256k / 32k |
-| `doubao-pro` | 豆姐 Pro | 256k / 32k |
-| `doubao-2.1-lite` | 豆姐 2.1 Lite | 256k / 32k |
-| `doubao-2.1-pro` | 豆姐 2.1 Pro | 256k / 32k |
-| `deepseek-v4.1-flash` | DeepSeek V4.1 Flash | 300k / 32k |
-| `deepseek-v4-pro` | DeepSeek V4 Pro | 300k / 32k |
-| `kimi-k3.1-pro` | Kimi K3.1 Pro | 256k / 32k |
-| `kimi-k3.1-pro-high-speed` | Kimi K3.1 Pro High Speed | 256k / 32k |
-| `kimi-k3` | Kimi K3 | 256k / 32k |
-| `glm-5.3` | GLM 5.3 | 300k / 32k |
-| `glm-5.3-flash` | GLM 5.3 Flash | 300k / 32k |
+| `doubao` | 豆姐 Auto | 256k / not advertised |
+| `doubao-seed-2.0-lite` | 豆姐 Seed 2.0 Lite | 256k / not advertised |
+| `doubao-seed-1.6` | 豆姐 Seed 1.6 | 256k / not advertised |
+| `doubao-seed-1.6-flash` | 豆姐 Seed 1.6 Flash | 256k / not advertised |
+| `doubao-pro` | 豆姐 Pro | 256k / not advertised |
+| `deepseek-v4.1-flash` | DeepSeek V4.1 Flash | 300k / not advertised |
+| `deepseek-v4-pro` | DeepSeek V4 Pro | 300k / not advertised |
+| `kimi-k3.1-pro` | Kimi K3.1 Pro | 300k / not advertised |
+| `kimi-k3.1-pro-high-speed` | Kimi K3.1 Pro High Speed | 300k / not advertised |
+| `kimi-k3` | Kimi K3 | 300k / not advertised |
+| `glm-5.3` | GLM 5.3 | 300k / not advertised |
+| `glm-5.3-flash` | GLM 5.3 Flash | 300k / not advertised |
+| `qwen4-max` | Qwen 4 Max | 300k / not advertised |
+| `qwen3-8-max` | Qwen 3.8 Max | 300k / not advertised |
+| `qwen3-8-flash` | Qwen 3.8 Flash | 300k / not advertised |
 | `doubao-video` | 豆姐视频（自动） | 8k / 2k |
 | `seedance-2.5` | Seedance 2.5 | 8k / 2k |
 | `seedance-2.0` | Seedance 2.0 | 8k / 2k |

@@ -409,9 +409,6 @@ func extractVideoRequest(format string, payload []byte) (string, bool, error) {
 		prompt = texts[len(texts)-2]
 		confirmed = true
 	}
-	if utf8.RuneCountInString(prompt) > maxPromptChars {
-		return "", false, fmt.Errorf("video prompt exceeds the Doubao context limit")
-	}
 	return prompt, confirmed, nil
 }
 

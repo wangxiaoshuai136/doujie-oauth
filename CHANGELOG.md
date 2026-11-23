@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.2.13 — 2026-11-23
+
+### 动态模型目录
+
+- 新增服务端模型目录发现：通过账号凭证调用豆包客户端的 `POST /alice/slot/action_bar_v3/brief_list`，读取 `menu_conf_v2` 中的模式、模型、上下文窗口和推理强度配置。
+- 目录按凭证缓存 10 分钟；请求失败时直接返回错误，不再回退静态文本模型；失败结果缓存 45 秒避免反复重试。
+- `need_upgrade=true` 的模型不再注册，避免把未开通模型宣告为可用。
+- 新增 `Qwen 4 Max`、`Qwen 3.8 Max`、`Qwen 3.8 Flash` 等由服务端下发的模型；后续新增模型不再需要改插件代码。
+- 不保留静态文本模型或兼容别名；请求的模型不在当前账号菜单中时直接返回 `400 model_unavailable`。
+
+### 思考强度与上下文
+
+- 模型元数据改为使用服务端 `reasoning_effort_config.option_list` 和 `default_level`；不再把所有模型统一宣告为 `low/medium/high + 可关闭`。
+- 请求中的 `reasoning_effort`、Responses 的 `reasoning.effort`、以及模型名后缀（如 `doubao-pro(high)`）现在会真正参与档位选择；不支持的档位回退到该模型默认档。
+- 支持服务端下发的 `3=low / 4=medium / 5=high / 6=xhigh / 7=max`，并修正 Auto、Lite 等模型的默认档位。
+- `ContextLength` 改为读取 `model_extra_params.total_window_size`；菜单不提供输出上限，因此不再设置 `MaxCompletionTokens` / `OutputTokenLimit`，输入上限等于总窗口。
+
+### 兼容说明
+
+- 动态目录不依赖 `a_bogus` 或外部签名器；只使用现有 Cookie 和公共请求参数。
+- `model.static` 只保留视频模型；文本模型完全由 `model.for_auth` 的动态目录提供。
+
 ## 0.2.12 — 2026-11-18
 
 ### 模型信息

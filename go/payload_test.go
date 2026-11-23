@@ -28,7 +28,7 @@ func buildPayloadForTest(t *testing.T, cfg, model string, c credential) (prepare
 	}
 	storage, _ := json.Marshal(c)
 	payload := []byte(`{"model":"` + model + `","messages":[{"role":"user","content":"hello"}]}`)
-	return buildRequest(pluginapi.ExecutorRequest{Payload: payload, Model: model, StorageJSON: storage}, nil)
+	return buildRequest(pluginapi.ExecutorRequest{Payload: payload, Model: model, StorageJSON: storage}, testCatalogSender())
 }
 
 func decodeBody(t *testing.T, plan preparedRequest) map[string]any {
@@ -89,7 +89,7 @@ func TestChatModeSelectionUsesDefaultBotAndOmitsTaskParams(t *testing.T) {
 }
 
 func TestCloudWorkTaskOnlyCarriesRuntimeType(t *testing.T) {
-	plan, err := buildPayloadForTest(t, "runtime: cloud", "glm-5.3-flash", testCredential())
+	plan, err := buildPayloadForTest(t, "runtime: cloud", "doubao-pro", testCredential())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +117,7 @@ func TestLocalWorkTaskCarriesClientDeviceFields(t *testing.T) {
 		"sandbox_auth_type: ask_risky",
 		`local_app_id: "497858"`,
 	}, "\n")
-	plan, err := buildPayloadForTest(t, cfg, "glm-5.3-flash", testCredential())
+	plan, err := buildPayloadForTest(t, cfg, "doubao-pro", testCredential())
 	if err != nil {
 		t.Fatal(err)
 	}

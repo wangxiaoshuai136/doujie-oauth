@@ -19,8 +19,6 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
 )
 
-const maxPromptChars = 120000
-
 type anthropicMessage struct {
 	Role    string          `json:"role"`
 	Content json.RawMessage `json:"content"`
@@ -66,27 +64,43 @@ func buildRequest(req pluginapi.ExecutorRequest, sender httpSender) (preparedReq
 		model = "doubao"
 	}
 	requestedModel := model
-	baseModel := cleanModelID(model)
+	baseModel, suffixEffort := splitModelAndEffort(model)
+	baseModel = cleanModelID(baseModel)
 	if baseModel == "" {
 		baseModel = "doubao"
 		requestedModel = baseModel
 	}
-	prompt, chars, requestDeep, err := extractPrompt(format, req.Payload)
-	if err != nil {
-		return out, pluginabi.NewError("invalid_request", err.Error(), 400)
-	}
-	cfg := getConfig()
-	profile := c.profile()
-	deep := cfg.DeepThink || wantsDeepThink(baseModel) || requestDeep
-	selection, hasSelection := selectionForModel(baseModel)
+	selection, hasSelection := selectionForRequest(c, baseModel, sender)
 	if c.site() != siteCN {
 		hasSelection = false
 	}
 	if c.site() == siteCN && !hasSelection {
 		return out, pluginabi.NewError("model_unavailable", "model is not available for this Doubao account", 400)
 	}
+	promptLimit := 0
+	if hasSelection {
+		promptLimit = int(selection.Context)
+	}
+	extraction, err := extractPromptRequest(format, req.Payload, promptLimit)
+	if err != nil {
+		return out, pluginabi.NewError("invalid_request", err.Error(), 400)
+	}
+	prompt := extraction.Prompt
+	chars := extraction.Chars
+	requestEffort := extraction.Effort
+	if strings.TrimSpace(suffixEffort) != "" {
+		requestEffort = suffixEffort
+	}
+	requestDeep := extraction.Deep || reasoningEffortEnabled(suffixEffort)
+	cfg := getConfig()
+	profile := c.profile()
+	deep := cfg.DeepThink || wantsDeepThink(baseModel) || requestDeep
 	deepValue := "0"
 	if hasSelection {
+		selection.ReasoningEffort = selection.effectiveEffort(requestEffort)
+		if selection.ReasoningEffort <= 0 {
+			return out, pluginabi.NewError("model_catalog_error", "model has no reasoning effort level", http.StatusBadGateway)
+		}
 		deepValue = selection.ItemID
 		if selection.ItemID != "0" {
 			deep = true
@@ -184,7 +198,7 @@ func securityParams(c credential, model string) url.Values {
 	return params
 }
 
-func flattenConversation(body anthropicRequest) (string, int, error) {
+func flattenConversation(body anthropicRequest, maxChars int) (string, int, error) {
 	var parts []string
 	if text := flattenBlocks(body.System); strings.TrimSpace(text) != "" {
 		parts = append(parts, "System instructions:\n"+text)
@@ -208,10 +222,11 @@ func flattenConversation(body anthropicRequest) (string, int, error) {
 	parts = append(parts, "Conversation:\n"+strings.Join(turns, "\n\n"))
 	parts = append(parts, "Reply as the assistant to the final user message.")
 	prompt := strings.Join(parts, "\n\n")
-	if utf8.RuneCountInString(prompt) > maxPromptChars {
+	chars := utf8.RuneCountInString(prompt)
+	if maxChars > 0 && chars > maxChars {
 		return "", 0, errors.New("prompt exceeds the Doubao web context limit")
 	}
-	return prompt, utf8.RuneCountInString(prompt), nil
+	return prompt, chars, nil
 }
 
 func flattenBlocks(raw json.RawMessage) string {

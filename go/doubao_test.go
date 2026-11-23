@@ -99,7 +99,7 @@ func TestFlattenConversation(t *testing.T) {
 			{Role: "user", Content: json.RawMessage(`[{"type":"text","text":"问题二"}]`)},
 		},
 	}
-	prompt, chars, err := flattenConversation(body)
+	prompt, chars, err := flattenConversation(body, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
