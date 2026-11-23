@@ -145,7 +145,7 @@ func staticModels() []pluginapi.ModelInfo {
 	return out
 }
 
-var globalDefaultModel = modelSpec{ID: "doubao", Display: "豆姐 Auto", Context: 256000, Version: "dola"}
+var globalDefaultModel = modelSpec{ID: "doubao", Display: "豆姐 Auto", Version: "dola"}
 
 func modelsForCredential(c credential, sender httpSender) ([]pluginapi.ModelInfo, error) {
 	if c.site() == siteGlobal {

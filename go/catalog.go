@@ -396,18 +396,10 @@ func catalogSpecFrom(model catalogModel, mode *catalogMode) (catalogSpec, bool) 
 	}
 
 	efforts, names, defaultEffort := catalogEffortConfig(model.ReasoningEffortConfig)
-	if len(efforts) == 0 {
-		efforts = []int{3, 4, 5}
-		names = map[int]string{3: "low", 4: "medium", 5: "high"}
-		defaultEffort = 5
-	}
 	if defaultEffort == 0 {
-		defaultEffort = efforts[0]
+		return catalogSpec{}, false
 	}
 	context := extraInt(model.ModelExtraParams, "total_window_size")
-	if context <= 0 {
-		context = 256000
-	}
 	return catalogSpec{
 		ID:          id,
 		Display:     catalogDisplayName(id, model.Name),
