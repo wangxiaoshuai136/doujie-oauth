@@ -77,6 +77,7 @@ OAuth 发起和轮询使用 CPA 原生受认证管理 API，公共插件资源�
 - 桌面 Cookies 被占用时返回明确的退出客户端后重试提示。
 - 默认浏览器账号登录，支持手机号、密码或短信验证码，无需扫码。
 - 原生 Anthropic Messages、OpenAI Chat Completions、OpenAI Responses 执行。
+- 文本模型目录由当前账号菜单动态下发，上下文窗口与思考档位同样来自服务端。
 - 深度思考与思维链流式回传。
 - 真实 `5h` / `7d` 配额窗口、重置时间与额度重置卡核销。
 - `samantha` 直连通道与可插拔外部签名器。
@@ -85,51 +86,49 @@ OAuth 发起和轮询使用 CPA 原生受认证管理 API，公共插件资源�
 
 ## 支持模型
 
-默认模型 ID 带 `doujie/` 前缀（例如 `doujie/glm-5.3-flash`），用于和其他供应商的同名模型区分；下表省略前缀。前缀可通过 `model_prefix` 修改，设为 `none` 关闭。执行器仍兼容无前缀和旧 `doubao/` 前缀的请求。
+默认模型 ID 带 `doujie/` 前缀（例如 `doujie/glm-5.3-flash`），用于和其他供应商的同名模型区分；下表均省略前缀。前缀可通过 `model_prefix` 修改，设为 `none` 关闭。执行器仍兼容无前缀和旧 `doubao/` 前缀的请求。
 
-实际可用模型以当前账号菜单的动态下发为准；下表是默认与兼容清单，服务端新增模型会自动出现。
+### 文本模型动态下发
 
-| Model ID | 显示名称 | 上下文 / 输出上限 |
+文本模型清单不是写死的。国内版登录后，插件读取当前账号的豆包模型菜单（`POST /alice/slot/action_bar_v3/brief_list`，`menu_conf_v2`），只注册该账号实际可用的模型；显示名称、上下文窗口（`total_window_size`）和思考档位也来自同一份下发数据，因此服务端新增模型不需要更新插件。
+
+- 目录按凭证缓存 10 分钟；查询失败缓存 45 秒并返回错误，不会回退到静态文本模型清单。
+- 标记 `need_upgrade` 的模型不会注册。
+- 请求账号菜单里没有的模型时返回 `400 model_unavailable`，而不是笼统的上游故障。
+- 菜单不提供输出上限，因此模型信息不宣告输出上限；输入上限等于模型总窗口。
+- Dola 国际版只展示国内版兼容的 `doubao` 文本模型。
+
+以下是已知菜单项的稳定 ID（属于 API 契约，客户端会持久化）；只有账号菜单里真实存在的项才会出现：
+
+| 稳定模型 ID | 官方菜单项 | 说明 |
 | --- | --- | --- |
-| `doubao` | 豆姐 Auto | 256k / 未下发 |
-| `doubao-seed-2.0-lite` | 豆姐 Seed 2.0 Lite | 256k / 未下发 |
-| `doubao-seed-1.6` | 豆姐 Seed 1.6 | 256k / 未下发 |
-| `doubao-seed-1.6-flash` | 豆姐 Seed 1.6 Flash | 256k / 未下发 |
-| `doubao-pro` | 豆姐 Pro | 256k / 未下发 |
-| `deepseek-v4.1-flash` | DeepSeek V4.1 Flash | 300k / 未下发 |
-| `deepseek-v4-pro` | DeepSeek V4 Pro | 300k / 未下发 |
-| `kimi-k3.1-pro` | Kimi K3.1 Pro | 300k / 未下发 |
-| `kimi-k3.1-pro-high-speed` | Kimi K3.1 Pro 高速 | 300k / 未下发 |
-| `kimi-k3` | Kimi K3 | 300k / 未下发 |
-| `glm-5.3` | GLM 5.3 | 300k / 未下发 |
-| `glm-5.3-flash` | GLM 5.3 Flash | 300k / 未下发 |
-| `qwen4-max` | Qwen 4 Max | 300k / 未下发 |
-| `qwen3-8-max` | Qwen 3.8 Max | 300k / 未下发 |
-| `qwen3-8-flash` | Qwen 3.8 Flash | 300k / 未下发 |
-| `doubao-video` | 豆姐视频（自动） | 8k / 2k |
-| `seedance-2.5` | Seedance 2.5 | 8k / 2k |
-| `seedance-2.0` | Seedance 2.0 | 8k / 2k |
-| `seedance-2.0-fast` | Seedance 2.0 Fast | 8k / 2k |
-| `seedance-2.0-mini` | Seedance 2.0 Mini | 8k / 2k |
+| `doubao` | 豆姐 Auto | 国内默认；也是 Dola 唯一文本模型 |
+| `doubao-pro` | 豆包 2.1 Pro | 菜单键 `5` |
+| `doubao-seed-2.0-lite` | 豆包 2.1 Lite | 菜单键 `seed-lite-7b` |
+| `doubao-seed-1.6` | 豆包 Seed 1.6 | |
+| `doubao-seed-1.6-flash` | 豆包 Seed 1.6 Flash | |
+| `deepseek-v4.1-flash` | DeepSeek V4.1 Flash | 工作模式 |
+| `deepseek-v4-pro` | DeepSeek V4 Pro | 工作模式 |
+| `kimi-k3.1-pro` | Kimi K3.1 Pro | 工作模式 |
+| `kimi-k3.1-pro-high-speed` | Kimi K3.1 Pro 高速 | 工作模式 |
+| `kimi-k3` | Kimi K3 | 工作模式 |
+| `glm-5.3` | GLM 5.3 | 工作模式 |
+| `glm-5.3-flash` | GLM 5.3 Flash | 工作模式 |
+| `qwen4-max` | Qwen 4 Max | 工作模式 |
+| `qwen3-8-max` | Qwen 3.8 Max | 工作模式 |
+| `qwen3-8-flash` | Qwen 3.8 Flash | 工作模式 |
 
-模型标识包含 `think` 或 `reason` 时自动开启深度思考；也可用 `deep_think: true`
-强制全局开启。
+没有固定别名的菜单项会根据菜单键生成 ID，同一模型在多次会话里保持同一个 ID。
 
-国内版文本模型会映射到豆包桌面客户端的模型菜单键：`doubao` → 自动（`9`），
-`doubao-pro` → 豆包 2.1 Pro（`5`），`doubao-seed-2.0-lite` → 豆包 2.1 Lite
-（`seed-lite-7b`）。这些请求会自动使用客户端的 `/chat/completion` 模型选择协议；
-`endpoint: samantha` 只影响没有模型菜单映射的请求。
+模型标识包含 `think` 或 `reason` 时自动开启深度思考；也可用 `deep_think: true` 强制全局开启。`reasoning_effort`（Responses 里为 `reasoning.effort`）会在服务端下发的档位中选择；不支持的档位回退到该模型默认档。
 
-新版工作模式的第三方模型也使用同一套菜单协议，包括 DeepSeek、Kimi 和 GLM。
-模型是否可见、价格倍率以及是否允许调用由豆包账号、套餐和服务端灰度决定；插件只负责
-把请求映射到对应的 `model_item_key`，不会绕过上游的订阅或额度校验。
-DeepSeek 和 GLM 的网关键带 `person-` 前缀，Kimi 使用 `kimi-` 前缀；第三方网关模型
-统一使用 `item_id=10001`。
-如果当前账号没有下发某个模型，插件会返回 `400 model_unavailable`，而不是把它误报成
-上游故障；Dola 国际版只展示国内版兼容的 `doubao` 文本模型，避免把国内工作模式模型
-错误暴露给不支持的账号。
+国内版文本模型会映射到豆包桌面客户端的模型菜单键：`doubao` → 自动（`9`），`doubao-pro` → 豆包 2.1 Pro（`5`），`doubao-seed-2.0-lite` → 豆包 2.1 Lite（`seed-lite-7b`）。这些请求会自动使用客户端的 `/chat/completion` 模型选择协议；`endpoint: samantha` 只影响没有模型菜单映射的请求。
+
+新版工作模式的第三方模型也使用同一套菜单协议，包括 DeepSeek、Kimi、GLM 和 Qwen。模型是否可见、价格倍率以及是否允许调用由豆包账号、套餐和服务端灰度决定；插件只负责把请求映射到对应的 `model_item_key`，不会绕过上游的订阅或额度校验，也不会把账号用不了的菜单项宣告成可用模型。
 
 ### 视频模型
+
+视频模型是唯一的静态清单，会追加到每个国内账号的目录里。
 
 `doubao-video` / `seedance-*` 走豆包会话视频 agent。首次调用只返回生成方案；
 用户确认后，在请求体加 `"confirm": true`，或在下一条用户消息中回复“确认生成”，

@@ -92,6 +92,8 @@ The plugin needs no local callback listener and no separate browser process.
 - Default browser account sign-in for phone, password or SMS login without scanning.
 - Native Anthropic Messages, OpenAI Chat Completions and OpenAI Responses
   execution.
+- Text model catalog discovered from the signed-in account menu, including
+  context windows and thinking levels.
 - Deep-thinking and reasoning streaming.
 - Real `5h` / `7d` quota windows, reset times and reset-card redemption.
 - `samantha` direct channel and pluggable external signer.
@@ -100,55 +102,49 @@ The plugin needs no local callback listener and no separate browser process.
 
 ## Supported models
 
-Advertised model IDs carry a `doujie/` prefix by default (for example `doujie/glm-5.3-flash`) so they do not collide with same-named models from other providers; the table below omits the prefix. Change it with `model_prefix`, or set it to `none` to disable. The executor still accepts unprefixed IDs and the legacy `doubao/` prefix.
+Advertised model IDs carry a `doujie/` prefix by default (for example `doujie/glm-5.3-flash`) so they do not collide with same-named models from other providers; the tables below omit the prefix. Change it with `model_prefix`, or set it to `none` to disable. The executor still accepts unprefixed IDs and the legacy `doubao/` prefix.
 
-The live model list is discovered from the signed-in account menu. The table below is the default and compatibility set; newly published server models appear automatically.
+### Dynamic text catalog
 
-| Model ID | Display name | Context / output limit |
+The text model list is not hardcoded. For the domestic entry, the plugin reads the signed-in account's Doubao model menu (`POST /alice/slot/action_bar_v3/brief_list`, `menu_conf_v2`) and registers exactly the models that account can use. The same response supplies each model's display name, context window (`total_window_size`) and thinking levels, so newly published server models appear without a plugin update.
+
+- The catalog is cached per credential for 10 minutes. A failed lookup is cached for 45 seconds and returned as an error; there is no static text fallback.
+- Models marked `need_upgrade` are not advertised.
+- If a model is not in the account's menu, the request returns `400 model_unavailable` instead of a generic upstream error.
+- The menu does not provide an output cap, so output limits are not advertised; the input limit equals the model's total window.
+- The Dola international entry exposes only the domestically compatible `doubao` text model.
+
+These IDs are stable API contracts for known menu entries; an entry appears only when the account's menu contains it:
+
+| Stable model ID | Official menu entry | Notes |
 | --- | --- | --- |
-| `doubao` | 豆姐 Auto | 256k / not advertised |
-| `doubao-seed-2.0-lite` | 豆姐 Seed 2.0 Lite | 256k / not advertised |
-| `doubao-seed-1.6` | 豆姐 Seed 1.6 | 256k / not advertised |
-| `doubao-seed-1.6-flash` | 豆姐 Seed 1.6 Flash | 256k / not advertised |
-| `doubao-pro` | 豆姐 Pro | 256k / not advertised |
-| `deepseek-v4.1-flash` | DeepSeek V4.1 Flash | 300k / not advertised |
-| `deepseek-v4-pro` | DeepSeek V4 Pro | 300k / not advertised |
-| `kimi-k3.1-pro` | Kimi K3.1 Pro | 300k / not advertised |
-| `kimi-k3.1-pro-high-speed` | Kimi K3.1 Pro High Speed | 300k / not advertised |
-| `kimi-k3` | Kimi K3 | 300k / not advertised |
-| `glm-5.3` | GLM 5.3 | 300k / not advertised |
-| `glm-5.3-flash` | GLM 5.3 Flash | 300k / not advertised |
-| `qwen4-max` | Qwen 4 Max | 300k / not advertised |
-| `qwen3-8-max` | Qwen 3.8 Max | 300k / not advertised |
-| `qwen3-8-flash` | Qwen 3.8 Flash | 300k / not advertised |
-| `doubao-video` | 豆姐视频（自动） | 8k / 2k |
-| `seedance-2.5` | Seedance 2.5 | 8k / 2k |
-| `seedance-2.0` | Seedance 2.0 | 8k / 2k |
-| `seedance-2.0-fast` | Seedance 2.0 Fast | 8k / 2k |
-| `seedance-2.0-mini` | Seedance 2.0 Mini | 8k / 2k |
+| `doubao` | 豆姐 Auto | Domestic default; also the only Dola text model |
+| `doubao-pro` | 豆包 2.1 Pro | Menu key `5` |
+| `doubao-seed-2.0-lite` | 豆包 2.1 Lite | Menu key `seed-lite-7b` |
+| `doubao-seed-1.6` | 豆包 Seed 1.6 | |
+| `doubao-seed-1.6-flash` | 豆包 Seed 1.6 Flash | |
+| `deepseek-v4.1-flash` | DeepSeek V4.1 Flash | Work mode |
+| `deepseek-v4-pro` | DeepSeek V4 Pro | Work mode |
+| `kimi-k3.1-pro` | Kimi K3.1 Pro | Work mode |
+| `kimi-k3.1-pro-high-speed` | Kimi K3.1 Pro High Speed | Work mode |
+| `kimi-k3` | Kimi K3 | Work mode |
+| `glm-5.3` | GLM 5.3 | Work mode |
+| `glm-5.3-flash` | GLM 5.3 Flash | Work mode |
+| `qwen4-max` | Qwen 4 Max | Work mode |
+| `qwen3-8-max` | Qwen 3.8 Max | Work mode |
+| `qwen3-8-flash` | Qwen 3.8 Flash | Work mode |
 
-Model IDs containing `think` or `reason` enable deep thinking automatically;
-`deep_think: true` forces it globally.
+Menu entries without a fixed alias get an ID derived from their menu key, so a new server model keeps one stable ID across sessions.
 
-Domestic text models map to the Doubao desktop model-menu keys: `doubao` to
-Auto (`9`), `doubao-pro` to Doubao 2.1 Pro (`5`), and
-`doubao-seed-2.0-lite` to Doubao 2.1 Lite (`seed-lite-7b`). These requests use
-the client `/chat/completion` model-selection protocol; `endpoint: samantha`
-only affects requests without a model-menu mapping.
+Model IDs containing `think` or `reason` enable deep thinking automatically; `deep_think: true` forces it globally. `reasoning_effort` (and `reasoning.effort` in Responses) selects one of the levels the server reports for that model; unsupported levels fall back to the model default.
 
-The newer Work-mode third-party models use the same menu protocol for DeepSeek,
-Kimi and GLM. Availability, price multipliers and permission are controlled by
-the Doubao account, subscription and server-side rollout. The plugin only maps
-requests to the corresponding `model_item_key`; it does not bypass upstream
-subscription or quota checks.
-DeepSeek and GLM gateway keys use a `person-` prefix, while Kimi keys use the
-`kimi-` prefix; gateway models share `item_id=10001`.
-If an account was not granted a model, the plugin returns `400 model_unavailable`
-instead of reporting a generic upstream failure. The Dola catalog exposes only
-the domestically compatible `doubao` text model so Work-mode models are not
-advertised to accounts that cannot use them.
+Domestic text models map to the Doubao desktop model-menu keys: `doubao` to Auto (`9`), `doubao-pro` to Doubao 2.1 Pro (`5`), and `doubao-seed-2.0-lite` to Doubao 2.1 Lite (`seed-lite-7b`). These requests use the client `/chat/completion` model-selection protocol; `endpoint: samantha` only affects requests without a model-menu mapping.
+
+The newer Work-mode third-party models use the same menu protocol for DeepSeek, Kimi, GLM and Qwen. Availability, price multipliers and permission are controlled by the Doubao account, subscription and server-side rollout. The plugin only maps requests to the corresponding `model_item_key`; it does not bypass upstream subscription or quota checks, and it never advertises a menu entry the account cannot use.
 
 ### Video models
+
+Video models are the only static list; they are appended to every domestic catalog.
 
 `doubao-video` and `seedance-*` use the signed-in Doubao video agent. The first
 chat request returns a short plan only. After the user confirms, set
