@@ -57,7 +57,7 @@ func TestManagementResourcesAreStaticOnly(t *testing.T) {
 }
 
 func TestManagementServesLogoAndDescriptor(t *testing.T) {
-	for _, path := range []string{resourcePrefix + "/logo.png", resourcePrefix + "/doubao.png", resourcePrefix + "/dola.png", resourcePrefix + "/account.html", resourcePrefix + "/qr.html", descriptorResourcePath} {
+	for _, path := range []string{resourcePrefix + "/logo.png", resourcePrefix + "/doubao.png", resourcePrefix + "/dola.png", resourcePrefix + "/account.html", descriptorResourcePath} {
 		resp, err := handleManagementResource(pluginapi.ManagementRequest{Method: "GET", Path: path})
 		if err != nil {
 			t.Fatal(err)

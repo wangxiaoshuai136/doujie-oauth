@@ -8,7 +8,7 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
 )
 
-var pluginVersion = "0.2.13"
+var pluginVersion = "0.2.16"
 
 type rpcAuthStart struct {
 	pluginapi.AuthLoginStartRequest
@@ -69,7 +69,7 @@ func registration() any {
 				{Name: "public_base_url", Type: pluginapi.ConfigFieldTypeString, Description: "Optional absolute CPA base URL used for the static login result pages."},
 				{Name: "endpoint", Type: pluginapi.ConfigFieldTypeEnum, EnumValues: []string{"samantha", "chat"}, Description: "Upstream endpoint family: samantha (default, direct HTTP) or chat (desktop completion, usually needs an external signer)."},
 				{Name: "app_version", Type: pluginapi.ConfigFieldTypeString, Description: "Doubao desktop client version sent in request parameters (default 2.1.7)."},
-				{Name: "auto_open_browser", Type: pluginapi.ConfigFieldTypeBoolean, Description: "Open the isolated browser automatically. When false, browser sign-in returns a QR login instead of launching a browser."},
+				{Name: "auto_open_browser", Type: pluginapi.ConfigFieldTypeBoolean, Description: "Open the isolated browser immediately. When false, the login returns an account sign-in link and starts the browser only after the link is opened."},
 				{Name: "browser", Type: pluginapi.ConfigFieldTypeString, Description: "Browser for account sign-in: auto, chrome, edge, or an absolute executable path."},
 				{Name: "runtime", Type: pluginapi.ConfigFieldTypeEnum, EnumValues: []string{"auto", "cloud", "local"}, Description: "Work-mode execution environment. auto uses local when workspace is set, otherwise cloud."},
 				{Name: "workspace", Type: pluginapi.ConfigFieldTypeString, Description: "Local workspace path for local work-mode tasks, for example D:\\WenPaul\\Documents."},
@@ -159,7 +159,7 @@ func handleMethod(method string, raw []byte) (any, error) {
 				{"path": "/logo.png", "menu": "", "description": "Plugin logo."},
 				{"path": "/imported.html", "menu": "", "description": "Desktop import result page."},
 				{"path": "/account.html", "menu": "", "description": "Browser-based account sign-in page."},
-				{"path": "/qr.html", "menu": "", "description": "QR sign-in page that renders the login code."},
+				{"path": "/account-launch", "menu": "", "description": "Starts the isolated sign-in browser for a pending login state."},
 				{"path": "/doubao.png", "menu": "", "description": "Domestic sign-in logo."},
 				{"path": "/dola.png", "menu": "", "description": "International sign-in logo."},
 				{"path": "/doujie.json", "menu": "", "description": "Public plugin declaration."},

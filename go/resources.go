@@ -2,6 +2,7 @@ package main
 
 import (
 	_ "embed"
+	"encoding/json"
 	"net/http"
 
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
@@ -41,6 +42,9 @@ func handleManagementResource(req pluginapi.ManagementRequest) (pluginapi.Manage
 }
 
 func handleManagementGet(req pluginapi.ManagementRequest) (pluginapi.ManagementResponse, error) {
+	if req.Path == resourcePrefix+"/account-launch" {
+		return handleAccountLaunch(req), nil
+	}
 	contentType := "image/png"
 	cacheControl := "public, max-age=86400"
 	var body []byte
@@ -63,10 +67,6 @@ func handleManagementGet(req pluginapi.ManagementRequest) (pluginapi.ManagementR
 		body = []byte(browserAccountPage)
 		contentType = "text/html; charset=utf-8"
 		cacheControl = "no-store"
-	case req.Path == resourcePrefix+"/qr.html":
-		body = []byte(qrLoginPage)
-		contentType = "text/html; charset=utf-8"
-		cacheControl = "no-store"
 	default:
 		return pluginapi.ManagementResponse{StatusCode: http.StatusNotFound, Body: []byte("not found")}, nil
 	}
@@ -81,6 +81,26 @@ func handleManagementGet(req pluginapi.ManagementRequest) (pluginapi.ManagementR
 	}, nil
 }
 
+func handleAccountLaunch(req pluginapi.ManagementRequest) pluginapi.ManagementResponse {
+	headers := http.Header{
+		"Content-Type":           {"application/json; charset=utf-8"},
+		"Cache-Control":          {"no-store"},
+		"X-Content-Type-Options": {"nosniff"},
+		"Referrer-Policy":        {"no-referrer"},
+	}
+	state := req.Query.Get("state")
+	if state == "" {
+		body, _ := json.Marshal(map[string]any{"status": "error", "error": "缺少登录状态，请回到面板重新开始"})
+		return pluginapi.ManagementResponse{StatusCode: http.StatusBadRequest, Headers: headers, Body: body}
+	}
+	if err := launchPendingBrowser(state); err != nil {
+		body, _ := json.Marshal(map[string]any{"status": "error", "error": err.Error()})
+		return pluginapi.ManagementResponse{StatusCode: http.StatusBadRequest, Headers: headers, Body: body}
+	}
+	body, _ := json.Marshal(map[string]any{"status": "ok"})
+	return pluginapi.ManagementResponse{StatusCode: http.StatusOK, Headers: headers, Body: body}
+}
+
 const desktopImportedPage = `<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8">
 <title>豆姐桌面端账号已导入</title>
@@ -93,32 +113,43 @@ const browserAccountPage = `<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>豆姐账号登录</title>
-<style>:root{color-scheme:dark}body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#0f172a;color:#e2e8f0;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}main{width:min(560px,100%);background:#1e293b;border-radius:18px;padding:34px;box-shadow:0 24px 70px rgba(0,0,0,.45)}h1{font-size:24px;margin:0 0 12px}p{line-height:1.7;color:#94a3b8}a{color:#38bdf8}.note{border-left:3px solid #38bdf8;background:#13233a;padding:12px 14px;border-radius:8px;color:#bae6fd}.small{font-size:13px;color:#64748b}</style></head>
-<body><main><h1>请在浏览器中完成登录</h1>
-<p>插件已使用系统默认浏览器打开一个独立窗口。你可以使用手机号验证码、账号密码或飞书账号登录，不需要扫码。</p>
-<div class="note">登录成功后，CPA 会自动读取该浏览器会话并完成授权。不要在这个窗口里打开其他账号的私人页面。</div>
-<p><a href="https://www.doubao.com/chat/" target="_blank" rel="noreferrer">如果浏览器没有自动弹出，点这里打开豆包</a></p>
-<p class="small">此窗口会在 5 分钟后失效；关闭本页不会中断已打开浏览器的登录。</p>
-</main></body></html>`
-const qrLoginPage = `<!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>豆姐扫码登录</title>
-<style>:root{color-scheme:dark}body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#0f172a;color:#e2e8f0;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}main{width:min(420px,100%);background:#1e293b;border-radius:18px;padding:32px;text-align:center;box-shadow:0 24px 70px rgba(0,0,0,.45)}h1{font-size:22px;margin:0 0 18px}img{width:260px;height:260px;border-radius:12px;background:#fff;padding:10px}p{line-height:1.7;color:#94a3b8;margin:16px 0 0}</style></head>
-<body><main><h1>使用豆姐 App 扫码登录</h1>
-<img id="qr" alt="登录二维码">
-<p id="hint">二维码加载中…</p></main>
+<style>:root{color-scheme:dark}body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#0f172a;color:#e2e8f0;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}main{width:min(560px,100%);background:#1e293b;border-radius:18px;padding:34px;box-shadow:0 24px 70px rgba(0,0,0,.45)}h1{font-size:24px;margin:0 0 12px}p{line-height:1.7;color:#94a3b8}.note{border-left:3px solid #38bdf8;background:#13233a;padding:12px 14px;border-radius:8px;color:#bae6fd}.small{font-size:13px;color:#64748b}button{margin-top:18px;border:0;border-radius:10px;background:#2563eb;color:#fff;font-size:15px;padding:11px 18px;cursor:pointer}button:disabled{background:#334155;color:#94a3b8;cursor:default}</style></head>
+<body><main><h1>请在账号登录窗口完成登录</h1>
+<p id="status">正在启动登录窗口…</p>
+<div class="note">只支持手机号、密码或短信验证码登录，不会显示二维码。登录成功后 CPA 会自动读取该窗口的会话。</div>
+<button id="retry" type="button" hidden>重新打开登录窗口</button>
+<p class="small">此链接会在 5 分钟后失效；关闭本页不会中断已经打开的登录窗口。</p>
+</main>
 <script>
 (function () {
-  var hash = location.hash.slice(1);
-  var img = document.getElementById('qr');
-  var hint = document.getElementById('hint');
-  if (!hash) {
-    hint.textContent = '二维码已失效，请回到面板重新获取。';
-    return;
+  var params = new URLSearchParams(location.search);
+  var state = params.get('state') || '';
+  var status = document.getElementById('status');
+  var retry = document.getElementById('retry');
+  function launch() {
+    if (!state) {
+      status.textContent = '缺少登录状态，请回到面板重新开始。';
+      return;
+    }
+    retry.hidden = true;
+    status.textContent = '正在启动登录窗口…';
+    fetch('account-launch?state=' + encodeURIComponent(state), { cache: 'no-store' })
+      .then(function (resp) { return resp.json().then(function (data) { return { ok: resp.ok, data: data }; }); })
+      .then(function (result) {
+        if (result.ok && result.data && result.data.status === 'ok') {
+          status.textContent = '登录窗口已打开，请在其中使用手机号、密码或短信验证码完成登录。';
+          return;
+        }
+        status.textContent = '启动失败：' + ((result.data && result.data.error) || '未知错误');
+        retry.hidden = false;
+      })
+      .catch(function (err) {
+        status.textContent = '启动失败：' + err;
+        retry.hidden = false;
+      });
   }
-  img.onload = function () { hint.textContent = '请在手机上确认登录，完成后回到面板。'; };
-  img.onerror = function () { hint.textContent = '二维码加载失败，请回到面板重新获取。'; };
-  img.src = 'data:image/png;base64,' + hash;
+  retry.addEventListener('click', launch);
+  launch();
 })();
-</script></body></html>`
+</script>
+</body></html>`

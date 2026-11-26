@@ -150,6 +150,61 @@ func TestParseLegacyDesktopAuthUsesDomesticEntry(t *testing.T) {
 	}
 }
 
+func TestStartLoginNeverUsesQR(t *testing.T) {
+	dir, err := os.MkdirTemp("", "dola-auth-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	defer func() {
+		flowMu.Lock()
+		flowStore = map[string]*loginFlow{}
+		flowMu.Unlock()
+	}()
+	cases := []struct {
+		provider string
+		site     string
+	}{
+		{entryID, siteCN},
+		{domesticQREntryID, siteCN},
+		{internationalEntryID, siteGlobal},
+		{internationalQREntryID, siteGlobal},
+	}
+	for _, tc := range cases {
+		resp, err := startLogin(pluginapi.AuthLoginStartRequest{
+			Provider: tc.provider,
+			BaseURL:  "http://127.0.0.1:8317/v8/management/oauth/callback",
+			Host:     pluginapi.HostConfigSummary{AuthDir: dir},
+			Metadata: map[string]any{"auto_open": "false"},
+		}, nil)
+		if err != nil {
+			t.Fatalf("%s: %v", tc.provider, err)
+		}
+		if resp.Metadata["site"] != tc.site || resp.Provider != credentialProvider || resp.State == "" {
+			t.Fatalf("%s: unexpected start response: %+v", tc.provider, resp)
+		}
+		if strings.Contains(resp.URL, "/qr.html") || strings.Contains(resp.URL, "base64") {
+			t.Fatalf("%s: QR fallback is not allowed: %q", tc.provider, resp.URL)
+		}
+		if !strings.Contains(resp.URL, "/account.html?state=") {
+			t.Fatalf("%s: expected account login URL, got %q", tc.provider, resp.URL)
+		}
+		if resp.Metadata["source"] != "browser-login" || resp.Metadata["auto_open"] != false {
+			t.Fatalf("%s: unexpected metadata: %+v", tc.provider, resp.Metadata)
+		}
+		poll, err := pollLogin(pluginapi.AuthLoginPollRequest{
+			State: resp.State,
+			Host:  pluginapi.HostConfigSummary{AuthDir: dir},
+		}, nil)
+		if err != nil {
+			t.Fatalf("%s poll: %v", tc.provider, err)
+		}
+		if !strings.Contains(poll.Message, "登录") {
+			t.Fatalf("%s: pending login should ask for the browser window: %+v", tc.provider, poll)
+		}
+	}
+}
+
 type sequenceSender struct {
 	responses []pluginapi.HTTPResponse
 	requests  []pluginapi.HTTPRequest
@@ -165,53 +220,13 @@ func (s *sequenceSender) Do(req pluginapi.HTTPRequest) (pluginapi.HTTPResponse, 
 	return resp, nil
 }
 
-func TestStartLoginGlobalUsesDolaFlow(t *testing.T) {
-	dir, err := os.MkdirTemp("", "dola-auth-*")
-	if err != nil {
-		t.Fatal(err)
+func TestAccountLaunchRejectsInvalidState(t *testing.T) {
+	resp := handleAccountLaunch(pluginapi.ManagementRequest{Method: http.MethodGet})
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("missing state must be rejected: %+v", resp)
 	}
-	defer os.RemoveAll(dir)
-	defer func() {
-		flowMu.Lock()
-		flowStore = map[string]*loginFlow{}
-		flowMu.Unlock()
-	}()
-	png := base64.StdEncoding.EncodeToString([]byte("PNG-BYTES-1234"))
-	sender := &sequenceSender{responses: []pluginapi.HTTPResponse{
-		{StatusCode: http.StatusOK, Headers: http.Header{"Set-Cookie": {"ttwid=tt; Path=/"}}, Body: []byte("<html>ok</html>")},
-		{StatusCode: http.StatusOK, Headers: http.Header{"Set-Cookie": {"passport_csrf_token=csrf; Path=/"}}, Body: []byte(`{"data":{"passport_csrf_token":"csrf"}}`)},
-		{StatusCode: http.StatusOK, Body: []byte(`{"data":{"token":"token","qrcode":"` + png + `"}}`)},
-	}}
-	resp, err := startLogin(pluginapi.AuthLoginStartRequest{
-		Provider: internationalQREntryID,
-		BaseURL:  "http://127.0.0.1:8317/v8/management/oauth/callback",
-		Host:     pluginapi.HostConfigSummary{AuthDir: dir},
-	}, sender)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if resp.Metadata["site"] != siteGlobal || resp.Provider != credentialProvider || resp.State == "" {
-		t.Fatalf("unexpected start response: %+v", resp)
-	}
-	if len(sender.requests) != 3 {
-		t.Fatalf("expected three upstream calls, got %d", len(sender.requests))
-	}
-	for _, req := range sender.requests {
-		if !strings.HasPrefix(req.URL, "https://www.dola.com/") {
-			t.Fatalf("unexpected global URL: %s", req.URL)
-		}
-	}
-	if !strings.Contains(sender.requests[1].URL, "aid=495671") || !strings.Contains(sender.requests[2].URL, "aid=495671") {
-		t.Fatalf("global AID missing: %v", sender.requests)
-	}
-	if !strings.Contains(sender.requests[2].Headers.Get("Cookie"), "passport_csrf_token=csrf") {
-		t.Fatalf("CSRF cookie not forwarded: %q", sender.requests[2].Headers.Get("Cookie"))
-	}
-	if !strings.Contains(resp.URL, "/qr.html#") {
-		t.Fatalf("QR URL = %q", resp.URL)
-	}
-	if resp.Metadata["qr_base64"] == "" {
-		t.Fatal("QR metadata missing base64 payload")
+	if err := launchPendingBrowser("invalid-state"); err == nil {
+		t.Fatal("invalid state must not launch a browser")
 	}
 }
 

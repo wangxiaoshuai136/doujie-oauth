@@ -48,12 +48,12 @@ instead of switching regions automatically by IP or browser language.
 | Doujie (domestic) | `doubao` | Default domestic entry: opens the system browser for account/SMS sign-in |
 | Doujie international (Dola) | `dola` | Default international entry: opens the system browser for Dola sign-in |
 
-Only the two primary entries are shown in the login picker. QR and desktop
+Only the two primary entries are shown in the login picker. Legacy and desktop
 import provider identifiers remain accepted internally for older clients, but
-they are no longer advertised as separate cards.
+they are no longer advertised as separate cards and never produce a QR code.
 
-QR scanning is optional. The desktop entry imports the local session without a
-phone. If Doubao is running and holds its cookie database open, the import fails
+Account sign-in does not require scanning. The desktop entry imports the local
+session without a phone. If Doubao is running and holds its cookie database open, the import fails
 with a clear message: quit Doubao from the tray, then retry the entry.
 
 The main domestic and Dola entries open the system default Chromium browser in an
@@ -85,8 +85,8 @@ The plugin needs no local callback listener and no separate browser process.
 
 ## Features
 
-- Separate domestic and Dola international QR entries; domestic by default, never
-  auto-switching regions.
+- Separate domestic and Dola international account sign-in entries with no QR
+  fallback; domestic by default, never auto-switching regions.
 - Windows desktop session import to avoid phone/desktop account mismatch.
 - Clear retry guidance when the desktop cookie database is locked.
 - Default browser account sign-in for phone, password or SMS login without scanning.
@@ -251,7 +251,7 @@ Releases are created by GitHub Actions whenever a `v*` tag is pushed.
 | `max_concurrency` | integer | `3` | 1–100 requests per credential |
 | `public_base_url` | string | empty | Fallback CPA URL for static login result pages |
 | `app_version` | string | `2.1.7` | Domestic client version identifier |
-| `auto_open_browser` | boolean | `false` | Open the isolated browser automatically when `true`; the default `false` returns a QR login and never launches a browser |
+| `auto_open_browser` | boolean | `false` | Launch the isolated browser immediately when `true`; the default `false` returns a manual account sign-in link and launches the browser only after it is opened |
 | `browser` | string | `auto` | `auto`, `chrome`, `edge`, or an absolute browser executable path |
 | `runtime` | enum | `auto` | `auto`, `cloud`, `local`; work-mode tasks only |
 | `workspace` | string | empty | Local directory used by `runtime: local`; `auto` selects local when set |

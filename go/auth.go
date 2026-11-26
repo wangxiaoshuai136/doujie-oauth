@@ -28,13 +28,15 @@ const (
 )
 
 type loginFlow struct {
-	Site     string
-	Token    string
-	CSRF     string
-	Cookies  map[string]string
-	Expires  time.Time
-	Browser  *browserLogin
-	Imported *pluginapi.AuthData
+	Site              string
+	Token             string
+	CSRF              string
+	Cookies           map[string]string
+	Expires           time.Time
+	Browser           *browserLogin
+	BrowserPreference string
+	PendingBrowser    bool
+	Imported          *pluginapi.AuthData
 }
 
 var flowMu sync.Mutex
@@ -146,115 +148,16 @@ func startLogin(req pluginapi.AuthLoginStartRequest, sender httpSender) (plugina
 	if err != nil {
 		return out, err
 	}
+	cacheStateKey(key)
 	switch req.Provider {
-	case entryID, browserEntryID:
-		if !autoOpenBrowser(req.Metadata) {
-			req.Provider = domesticQREntryID
-			return startLogin(req, sender)
-		}
-		return startBrowserAccountLogin(req, key, siteCN)
-	case internationalEntryID, dolaBrowserEntryID:
-		if !autoOpenBrowser(req.Metadata) {
-			req.Provider = internationalQREntryID
-			return startLogin(req, sender)
-		}
-		return startBrowserAccountLogin(req, key, siteGlobal)
-	}
-	if req.Provider == desktopEntryID {
+	case entryID, browserEntryID, domesticQREntryID:
+		return beginBrowserAccountLogin(req, key, siteCN)
+	case internationalEntryID, dolaBrowserEntryID, internationalQREntryID:
+		return beginBrowserAccountLogin(req, key, siteGlobal)
+	case desktopEntryID:
 		return startDesktopImport(req, sender, key)
 	}
-	site := siteCN
-	if req.Provider == internationalQREntryID {
-		site = siteGlobal
-	}
-	profile := profileForSite(site)
-	jar := map[string]string{}
-	resp, err := httpGet(sender, profile.Root+"/", browserHeadersForSite(site, nil), jar)
-	if err != nil {
-		return out, errors.New("cannot reach Doubao login")
-	}
-	if resp.StatusCode >= 400 {
-		return out, fmt.Errorf("Doubao login page returned HTTP %d", resp.StatusCode)
-	}
-	csrfResp, err := httpGet(sender, profile.Root+"/passport/safe/csrf_token/?aid="+profile.PassportAID, browserHeadersForSite(site, nil), jar)
-	if err != nil {
-		return out, errors.New("cannot request Doubao CSRF token")
-	}
-	csrf := jar["passport_csrf_token"]
-	if csrf == "" {
-		csrf = jar["passport_csrf_token_default"]
-	}
-	var csrfEnvelope struct {
-		Data struct {
-			PassportCSRFToken string `json:"passport_csrf_token"`
-		} `json:"data"`
-	}
-	if json.Unmarshal(csrfResp.Body, &csrfEnvelope) == nil && csrfEnvelope.Data.PassportCSRFToken != "" {
-		csrf = csrfEnvelope.Data.PassportCSRFToken
-	}
-	if csrf == "" {
-		return out, errors.New("Doubao did not return a CSRF token")
-	}
-	next := url.QueryEscape(profile.Root)
-	qrURL := profile.Root + "/passport/web/get_qrcode/?next=" + next + "&aid=" + profile.PassportAID
-	qrResp, err := httpGet(sender, qrURL, browserHeadersForSite(site, http.Header{"X-Tt-Passport-Csrf-Token": {csrf}}), jar)
-	if err != nil {
-		return out, errors.New("cannot request Doubao login QR code")
-	}
-	var qrEnvelope struct {
-		Data struct {
-			Token     string `json:"token"`
-			QRCode    string `json:"qrcode"`
-			QRCodeURL string `json:"qrcode_url"`
-		} `json:"data"`
-	}
-	if json.Unmarshal(qrResp.Body, &qrEnvelope) != nil || qrEnvelope.Data.Token == "" {
-		return out, errors.New("Doubao returned an invalid login QR code")
-	}
-	png, err := loadQRImage(sender, qrEnvelope.Data.QRCode, qrEnvelope.Data.QRCodeURL)
-	if err != nil {
-		return out, err
-	}
-	flowID, err := randomHex(16)
-	if err != nil {
-		return out, errors.New("cannot generate login state")
-	}
-	expires := time.Now().Add(flowsTTL)
-	putFlow(flowID, &loginFlow{Site: site, Token: qrEnvelope.Data.Token, CSRF: csrf, Cookies: jar, Expires: expires})
-	state, err := sealState(key, flowID, expires)
-	if err != nil {
-		return out, err
-	}
-	qrBase64 := base64.StdEncoding.EncodeToString(png)
-	loginURL := ""
-	for _, candidate := range []string{qrEnvelope.Data.QRCodeURL, qrEnvelope.Data.QRCode} {
-		candidate = strings.TrimSpace(candidate)
-		if strings.HasPrefix(candidate, "https://") || strings.HasPrefix(candidate, "http://") {
-			loginURL = candidate
-			break
-		}
-	}
-	if loginURL == "" {
-		if base := absoluteBase(getConfig().PublicBaseURL, req.BaseURL); base != "" {
-			loginURL = base + resourcePrefix + "/qr.html#" + qrBase64
-		} else {
-			loginURL = "data:image/png;base64," + qrBase64
-		}
-	}
-	out = pluginapi.AuthLoginStartResponse{
-		Provider:  credentialProvider,
-		URL:       loginURL,
-		State:     state,
-		ExpiresAt: expires.UTC(),
-		Metadata: map[string]any{
-			"site":        site,
-			"qr_base64":   qrBase64,
-			"qr_mime":     "image/png",
-			"poll_hint":   "scan with the mobile app",
-			"expires_sec": int(flowsTTL / time.Second),
-		},
-	}
-	return out, nil
+	return out, fmt.Errorf("unsupported login provider %q", req.Provider)
 }
 
 func absoluteBase(publicBase, hostBase string) string {
@@ -346,6 +249,10 @@ func pollLogin(req pluginapi.AuthLoginPollRequest, sender httpSender) (pluginapi
 	if flow.Imported != nil {
 		takeFlow(flowID)
 		return pluginapi.AuthLoginPollResponse{Status: pluginapi.AuthLoginStatusSuccess, Auth: *flow.Imported}, nil
+	}
+	if flow.PendingBrowser && flow.Browser == nil {
+		pending.Message = "请打开登录链接，在账号登录窗口中完成登录"
+		return pending, nil
 	}
 	if flow.Browser != nil {
 		cookies, browserErr := flow.Browser.PollCookies()
@@ -607,38 +514,122 @@ func startDesktopImport(req pluginapi.AuthLoginStartRequest, sender httpSender, 
 	return out, nil
 }
 
+func beginBrowserAccountLogin(req pluginapi.AuthLoginStartRequest, key []byte, site string) (pluginapi.AuthLoginStartResponse, error) {
+	if autoOpenBrowser(req.Metadata) {
+		return startBrowserAccountLogin(req, key, site)
+	}
+	return prepareBrowserAccountLogin(req, key, site)
+}
+
 func startBrowserAccountLogin(req pluginapi.AuthLoginStartRequest, key []byte, site string) (pluginapi.AuthLoginStartResponse, error) {
+	return newBrowserAccountLogin(req, key, site, true)
+}
+
+func prepareBrowserAccountLogin(req pluginapi.AuthLoginStartRequest, key []byte, site string) (pluginapi.AuthLoginStartResponse, error) {
+	return newBrowserAccountLogin(req, key, site, false)
+}
+
+func newBrowserAccountLogin(req pluginapi.AuthLoginStartRequest, key []byte, site string, launch bool) (pluginapi.AuthLoginStartResponse, error) {
 	var out pluginapi.AuthLoginStartResponse
-	browser, err := startBrowserLoginWithBrowser(site, browserPreference(req.Metadata))
-	if err != nil {
-		return out, fmt.Errorf("cannot open browser sign-in: %w", err)
+	preference := browserPreference(req.Metadata)
+	var browser *browserLogin
+	if launch {
+		opened, err := startBrowserLoginWithBrowser(site, preference)
+		if err != nil {
+			return out, fmt.Errorf("cannot open browser sign-in: %w", err)
+		}
+		browser = opened
 	}
 	flowID, err := randomHex(16)
 	if err != nil {
-		browser.Close()
+		if browser != nil {
+			browser.Close()
+		}
 		return out, errors.New("cannot generate login state")
 	}
 	expires := time.Now().Add(flowsTTL)
-	putFlow(flowID, &loginFlow{Site: normalizeSite(site), Expires: expires, Browser: browser})
+	putFlow(flowID, &loginFlow{
+		Site:              normalizeSite(site),
+		Expires:           expires,
+		Browser:           browser,
+		BrowserPreference: preference,
+		PendingBrowser:    !launch,
+	})
 	state, err := sealState(key, flowID, expires)
 	if err != nil {
-		browser.Close()
+		if browser != nil {
+			browser.Close()
+		}
 		takeFlow(flowID)
 		return out, err
 	}
 	base := absoluteBase(getConfig().PublicBaseURL, req.BaseURL)
+	message := "已打开浏览器，请使用手机号、密码或短信验证码完成登录"
+	if !launch {
+		message = "点击“打开”后在登录窗口中完成账号登录"
+	}
 	return pluginapi.AuthLoginStartResponse{
 		Provider:  credentialProvider,
-		URL:       base + resourcePrefix + "/account.html",
+		URL:       base + resourcePrefix + "/account.html?state=" + url.QueryEscape(state),
 		State:     state,
 		ExpiresAt: expires.UTC(),
 		Metadata: map[string]any{
 			"source":         "browser-login",
-			"message":        "已打开浏览器，请使用手机号、密码或短信验证码完成登录",
+			"message":        message,
 			"oauth_provider": entryForSite(site),
 			"site":           normalizeSite(site),
+			"auto_open":      launch,
 		},
 	}, nil
+}
+
+func launchPendingBrowser(state string) error {
+	key := cachedStateKey()
+	if key == nil {
+		return errors.New("登录流程已失效，请回到面板重新开始")
+	}
+	flowID, expires, err := openState(key, state)
+	if err != nil {
+		return errors.New("登录链接无效，请回到面板重新开始")
+	}
+	if time.Now().After(expires) {
+		if flow := peekFlow(flowID); flow != nil && flow.Browser != nil {
+			flow.Browser.Close()
+		}
+		takeFlow(flowID)
+		return errors.New("登录链接已过期，请回到面板重新开始")
+	}
+	flow := peekFlow(flowID)
+	if flow == nil {
+		return errors.New("登录流程已失效，请回到面板重新开始")
+	}
+	if flow.Browser != nil {
+		return nil
+	}
+	browser, err := startBrowserLoginWithBrowser(flow.Site, flow.BrowserPreference)
+	if err != nil {
+		return fmt.Errorf("cannot open browser sign-in: %w", err)
+	}
+	if !attachFlowBrowser(flowID, browser) {
+		browser.Close()
+		return errors.New("登录流程已失效，请回到面板重新开始")
+	}
+	return nil
+}
+
+func attachFlowBrowser(flowID string, browser *browserLogin) bool {
+	flowMu.Lock()
+	defer flowMu.Unlock()
+	flow := flowStore[flowID]
+	if flow == nil || flow.Expires.Before(time.Now()) {
+		return false
+	}
+	if flow.Browser != nil {
+		return false
+	}
+	flow.Browser = browser
+	flow.PendingBrowser = false
+	return true
 }
 
 func autoOpenBrowser(metadata map[string]any) bool {

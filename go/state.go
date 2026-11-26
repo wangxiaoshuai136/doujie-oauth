@@ -16,6 +16,27 @@ import (
 
 var stateKeyMu sync.Mutex
 
+var cachedKeyMu sync.RWMutex
+var cachedKey []byte
+
+func cacheStateKey(key []byte) {
+	if len(key) != 32 {
+		return
+	}
+	cachedKeyMu.Lock()
+	cachedKey = append(cachedKey[:0], key...)
+	cachedKeyMu.Unlock()
+}
+
+func cachedStateKey() []byte {
+	cachedKeyMu.RLock()
+	defer cachedKeyMu.RUnlock()
+	if len(cachedKey) != 32 {
+		return nil
+	}
+	return append([]byte(nil), cachedKey...)
+}
+
 func loadStateKey(authDir string) ([]byte, error) {
 	if authDir == "" {
 		return nil, errors.New("CPA auth directory unavailable")

@@ -81,10 +81,12 @@ location.
 
 Browser launch follows the plugin/software settings:
 
-- `auto_open_browser` defaults to `false`: a normal login never launches a browser and
-  returns a QR login response instead. Set it to `true` to opt in.
+- `auto_open_browser` defaults to `false`: a normal login returns a manual account
+  sign-in link without launching a browser. Set it to `true` to launch immediately.
 - An explicit OAuth metadata `browser` value (for example `chrome` or `edge`) enables
-  browser sign-in; `auto_open=false` or `browser=none` keeps the flow headless.
+  immediate browser sign-in; `auto_open=false` or `browser=none` returns the manual link.
+- The primary and legacy login entries never return a QR code. Opening the manual link
+  starts the isolated browser and asks for a phone number, password or SMS code.
 - `browser: auto|chrome|edge|<absolute path>` selects the browser to launch.
   OAuth metadata `browser`, `browser_name`, `browser_path`, or `browser_executable`
   takes precedence when the host supplies it.
