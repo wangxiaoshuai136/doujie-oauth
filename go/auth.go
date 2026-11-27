@@ -536,7 +536,7 @@ func newBrowserAccountLogin(req pluginapi.AuthLoginStartRequest, key []byte, sit
 	if launch {
 		opened, err := startBrowserLoginWithBrowser(site, preference)
 		if err != nil {
-			return out, fmt.Errorf("cannot open browser sign-in: %w", err)
+			return out, pluginabi.NewError("browser_unavailable", fmt.Sprintf("cannot open browser sign-in: %v", err), http.StatusBadRequest)
 		}
 		browser = opened
 	}
@@ -608,7 +608,7 @@ func launchPendingBrowser(state string) error {
 	}
 	browser, err := startBrowserLoginWithBrowser(flow.Site, flow.BrowserPreference)
 	if err != nil {
-		return fmt.Errorf("cannot open browser sign-in: %w", err)
+		return pluginabi.NewError("browser_unavailable", fmt.Sprintf("cannot open browser sign-in: %v", err), http.StatusBadRequest)
 	}
 	if !attachFlowBrowser(flowID, browser) {
 		browser.Close()

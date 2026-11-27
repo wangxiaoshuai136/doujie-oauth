@@ -69,15 +69,18 @@ The plugin does not auto-detect regions. Choose either **豆姐（国内版）**
 
 ### Option C: Browser Account Sign-In (No QR)
 
-Choose **豆姐（国内版）** or **豆姐国际版（Dola）**. The plugin opens the system
-default Chromium browser in an isolated profile and the matching login page.
+Choose **豆姐（国内版）** or **豆姐国际版（Dola）**. The plugin opens an installed
+Chromium browser (Chrome, Edge, Brave, Chromium or Vivaldi) in an isolated profile
+and the matching login page.
 Enter the phone number, password or SMS code there. A loopback-only DevTools
 connection reads the resulting cookies; the plugin never receives or stores the
 password. The browser and temporary profile are closed after success or expiry.
 
-This mode requires a desktop Windows session and a Chromium-compatible default
-browser. Set `DOUJIE_BROWSER_PATH` if the browser is installed in a non-standard
-location.
+This mode requires a desktop Windows or macOS session and an installed
+Chromium-compatible browser (Safari is not supported). `auto` probes the standard
+Windows install locations on Windows and `/Applications` plus `~/Applications` on
+macOS. Set `DOUJIE_BROWSER_PATH` if the browser is installed elsewhere. Linux
+builds return a clear unsupported-platform error and do not fall back to QR.
 
 Browser launch follows the plugin/software settings:
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.19 — 2026-11-27
+
+### macOS 浏览器登录
+
+- 将 CDP 隔离浏览器登录拆成共享实现与 Windows/macOS 启动层，macOS 支持 Chrome、Edge、Brave、Chromium、Vivaldi。
+- macOS 使用 `$TMPDIR` 下的临时 profile、回环 DevTools 端口和独立进程组；退出或过期时关闭浏览器并清理 profile。
+- `DOUJIE_BROWSER_PATH` 仍可覆盖浏览器路径；macOS 的 `auto` 会探测 `/Applications` 与 `~/Applications`，Safari 不支持。
+- Linux 继续返回明确的“不支持浏览器登录”错误，不回退二维码。
+
 ## 0.2.18 — 2026-11-27
 
 ### 修复

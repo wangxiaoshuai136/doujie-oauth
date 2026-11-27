@@ -56,8 +56,10 @@ Account sign-in does not require scanning. The desktop entry imports the local
 session without a phone. If Doubao is running and holds its cookie database open, the import fails
 with a clear message: quit Doubao from the tray, then retry the entry.
 
-The main domestic and Dola entries open the system default Chromium browser in an
-isolated profile. Sign in there with the phone number, password or SMS code you
+The main domestic and Dola entries open an installed Chromium browser (Chrome,
+Edge, Brave, Chromium or Vivaldi) in an isolated profile. Browser sign-in is
+supported on Windows and macOS; Safari is not supported. Sign in there with the
+phone number, password or SMS code you
 already use; the plugin reads the resulting session through a loopback-only
 DevTools connection. It never stores the account password. `doubao-account` is
 kept as a legacy alias for existing clients.

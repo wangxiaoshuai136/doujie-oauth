@@ -60,11 +60,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          version="0.2.18"
+          version="0.2.19"
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             version="${GITHUB_REF_NAME#v}"
           fi
           echo "VERSION=${version}" >> "$GITHUB_ENV"
+      - name: Test darwin package
+        if: matrix.goos == 'darwin' && matrix.goarch == 'amd64'
+        working-directory: go
+        run: go test ./...
       - name: Build shared library
         shell: bash
         env:
