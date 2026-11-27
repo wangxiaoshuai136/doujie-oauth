@@ -69,6 +69,9 @@ func execute(req pluginapi.ExecutorRequest, sender httpSender) (pluginapi.Execut
 	if isVideoModel(req.Model) {
 		return executeVideo(req, sender)
 	}
+	if err := authCooldownError(req.AuthID); err != nil {
+		return pluginapi.ExecutorResponse{}, err
+	}
 	release := acquire(req.AuthID)
 	defer release()
 	plan, err := buildRequest(req, sender)
@@ -80,7 +83,7 @@ func execute(req pluginapi.ExecutorRequest, sender httpSender) (pluginapi.Execut
 		return pluginapi.ExecutorResponse{}, pluginabi.NewError("transport_error", "Doubao upstream transport failed", 503)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return pluginapi.ExecutorResponse{}, upstreamError(resp.StatusCode, resp.Body)
+		return pluginapi.ExecutorResponse{}, upstreamErrorFor(req.AuthID, resp.StatusCode, resp.Body)
 	}
 	var text, think string
 	var collectErr error
@@ -91,7 +94,7 @@ func execute(req pluginapi.ExecutorRequest, sender httpSender) (pluginapi.Execut
 	}
 	usageEvents.record(req.AuthID, collectErr != nil)
 	if collectErr != nil {
-		return pluginapi.ExecutorResponse{}, upstreamFailureError(collectErr.Error())
+		return pluginapi.ExecutorResponse{}, classifyUpstreamFailure(req.AuthID, collectErr)
 	}
 	return pluginapi.ExecutorResponse{
 		Payload: encodeMessage(plan.Format, plan.Model, text, think),
@@ -110,6 +113,9 @@ func executeStream(req pluginapi.ExecutorRequest, callbackID, streamID string, s
 	}
 	if isVideoModel(req.Model) {
 		return executeVideoStream(req, callbackID, streamID, sender)
+	}
+	if err := authCooldownError(req.AuthID); err != nil {
+		return nil, err
 	}
 	release := acquire(req.AuthID)
 	plan, err := buildRequest(req, sender)
@@ -132,9 +138,9 @@ func executeStream(req pluginapi.ExecutorRequest, callbackID, streamID string, s
 		if readErr != nil {
 			return nil, pluginabi.NewError("transport_error", "Doubao upstream stream failed", 503)
 		}
-		return nil, upstreamError(response.StatusCode, raw)
+		return nil, upstreamErrorFor(req.AuthID, response.StatusCode, raw)
 	}
-	initial, err := bootstrapDoubaoStream(response.StreamID, plan.Endpoint)
+	initial, err := bootstrapDoubaoStream(response.StreamID, plan.Endpoint, req.AuthID)
 	if err != nil {
 		closeHostStream(response.StreamID)
 		release()
@@ -149,7 +155,7 @@ func executeStream(req pluginapi.ExecutorRequest, callbackID, streamID string, s
 // CPA commits an SSE response. This lets quota/auth failures trigger normal
 // credential retry instead of becoming a 200 stream that can no longer fail
 // over to another account.
-func bootstrapDoubaoStream(source, endpoint string) ([]byte, error) {
+func bootstrapDoubaoStream(source, endpoint, authID string) ([]byte, error) {
 	var pending []byte
 	inThinking := false
 	parse := func(payload []byte) (doubaoMessage, bool) {
@@ -182,6 +188,9 @@ func bootstrapDoubaoStream(source, endpoint string) ([]byte, error) {
 			msg, ok := parse([]byte(payload))
 			if !ok {
 				continue
+			}
+			if msg.Err != nil {
+				return nil, classifyUpstreamFailure(authID, msg.Err)
 			}
 			if msg.Failure != "" {
 				return nil, upstreamFailureError(msg.Failure)
@@ -236,6 +245,10 @@ func forwardDoubao(source, target, authID, model, format, endpoint string, dataO
 			if !ok {
 				continue
 			}
+			if msg.Err != nil {
+				applyStreamErrorCooldown(authID, msg.Err)
+				return false, streamFailureText(msg.Err)
+			}
 			if msg.Failure != "" {
 				return false, sanitizeUpstream(msg.Failure)
 			}
@@ -288,6 +301,12 @@ func forwardDoubao(source, target, authID, model, format, endpoint string, dataO
 	}
 	if payload := sseData(string(pending)); payload != "" {
 		if msg, ok := parse([]byte(payload)); ok {
+			if msg.Err != nil {
+				applyStreamErrorCooldown(authID, msg.Err)
+				streamError = streamFailureText(msg.Err)
+				closeStream(target, streamError)
+				return
+			}
 			if msg.Failure != "" {
 				streamError = sanitizeUpstream(msg.Failure)
 				closeStream(target, streamError)
@@ -327,6 +346,15 @@ func requestPath(req pluginapi.ExecutorRequest) string {
 }
 
 func upstreamError(status int, body []byte) error {
+	return upstreamErrorFor("", status, body)
+}
+
+func upstreamErrorFor(authID string, status int, body []byte) error {
+	if status != http.StatusUnauthorized && status != http.StatusForbidden {
+		if streamErr := streamErrorFromBody(body); streamErr != nil {
+			return classifyUpstreamFailure(authID, streamErr)
+		}
+	}
 	message := upstreamMessage(body)
 	switch {
 	case status == http.StatusUnauthorized || status == http.StatusForbidden:

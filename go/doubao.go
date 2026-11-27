@@ -269,6 +269,7 @@ type doubaoMessage struct {
 	Status      int
 	Finished    bool
 	Failure     string
+	Err         *doubaoStreamError
 }
 
 func parseDoubaoEvent(data []byte) (doubaoMessage, bool) {
@@ -282,6 +283,14 @@ func parseDoubaoEvent(data []byte) (doubaoMessage, bool) {
 	}
 	msg.EventType = outer.EventType
 	if outer.EventType == 2005 {
+		if obj := objectFromRaw(outer.EventData); len(obj) > 0 {
+			if streamErr := streamErrorFromObject(obj); streamErr != nil {
+				msg.Err = streamErr
+				msg.Failure = streamErr.Error()
+				msg.Finished = true
+				return msg, true
+			}
+		}
 		var detail string
 		if json.Unmarshal(outer.EventData, &detail) == nil {
 			msg.Failure = detail
@@ -344,6 +353,9 @@ func collectDoubao(body []byte) (string, string, error) {
 		msg, ok := parseDoubaoEvent([]byte(payload))
 		if !ok {
 			continue
+		}
+		if msg.Err != nil {
+			return "", "", msg.Err
 		}
 		if msg.Failure != "" {
 			return "", "", errors.New(sanitizeUpstream(msg.Failure))
@@ -743,8 +755,9 @@ func parseChatEvent(data []byte, inThinking *bool) (doubaoMessage, bool) {
 	if json.Unmarshal(data, &obj) != nil {
 		return msg, false
 	}
-	if code := asInt(obj["error_code"]); code != 0 {
-		msg.Failure = sanitizeUpstream(fmt.Sprintf("code=%d %v", code, obj["error_msg"]))
+	if code := looseInt(obj["error_code"]); code != 0 {
+		msg.Err = newDoubaoStreamError(code, firstStringValue(obj["error_msg"], obj["message"], obj["msg"]), obj)
+		msg.Failure = msg.Err.Error()
 		msg.Finished = true
 		return msg, true
 	}
@@ -830,6 +843,9 @@ func collectDoubaoChat(body []byte) (string, string, error) {
 		msg, ok := parseChatEvent([]byte(payload), &inThinking)
 		if !ok {
 			continue
+		}
+		if msg.Err != nil {
+			return "", "", msg.Err
 		}
 		if msg.Failure != "" {
 			return "", "", errors.New(msg.Failure)

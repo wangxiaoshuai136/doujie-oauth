@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.18 — 2026-11-27
+
+### 修复
+
+- 将豆包 `710022004` 风控验证与 `710022002` 短时限流从 `quota_exhausted` 中拆出，分别返回 `verification_required` 与 `rate_limited`，并携带 `Retry-After`。
+- 命中验证或限流后按 auth 冷却（验证 10 分钟、限流 30 秒），后续模型请求直接快速失败，避免批量健康检测继续冲击上游。
+- 解析 SSE `extra.decision`，保留 `type=verify`、`verify_scene` 与 `subtype`，并在错误信息中提示到豆包完成验证。
+
 ## 0.2.17 — 2026-11-27
 
 ### 文档更新

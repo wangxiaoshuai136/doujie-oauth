@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 )
@@ -65,6 +66,47 @@ func TestCollectDoubao(t *testing.T) {
 	}
 	if text != "你好世界" || think != "先想一想" {
 		t.Fatalf("unexpected aggregate: %q %q", text, think)
+	}
+}
+
+func TestParseChatVerificationChallenge(t *testing.T) {
+	payload := []byte(`{"error_code":710022004,"error_msg":"rate limited","extra":{"decision":"{\"from\":\"shark_admin\",\"type\":\"verify\",\"subtype\":\"semantic_reasoning\",\"verify_scene\":\"doubao_message_web\"}"}}`)
+	inThinking := false
+	msg, ok := parseChatEvent(payload, &inThinking)
+	if !ok || !msg.Finished || msg.Err == nil {
+		t.Fatalf("expected structured verification error: %+v", msg)
+	}
+	if msg.Err.Code != 710022004 || msg.Err.Scene != "doubao_message_web" || msg.Err.Subtype != "semantic_reasoning" {
+		t.Fatalf("unexpected verification details: %+v", msg.Err)
+	}
+	if !strings.Contains(msg.Failure, "710022004") {
+		t.Fatalf("failure text lost the upstream code: %q", msg.Failure)
+	}
+
+	_, _, err := collectDoubaoChat([]byte("data: " + string(payload)))
+	var streamErr *doubaoStreamError
+	if !errors.As(err, &streamErr) || streamErr.Code != 710022004 {
+		t.Fatalf("collectDoubaoChat did not preserve the verification error: %#v", err)
+	}
+}
+
+func TestParseDoubaoStructuredFailureEvent(t *testing.T) {
+	raw, _ := json.Marshal(map[string]any{
+		"event_type": 2005,
+		"event_data": map[string]any{
+			"error_code": 710022004,
+			"error_msg":  "rate limited",
+			"extra": map[string]any{
+				"decision": `{"type":"verify","subtype":"semantic_reasoning","verify_scene":"doubao_message_web"}`,
+			},
+		},
+	})
+	msg, ok := parseDoubaoEvent(raw)
+	if !ok || !msg.Finished || msg.Err == nil {
+		t.Fatalf("expected structured samantha failure: %+v", msg)
+	}
+	if msg.Err.Code != 710022004 || msg.Err.Scene != "doubao_message_web" || msg.Err.Subtype != "semantic_reasoning" {
+		t.Fatalf("unexpected samantha verification details: %+v", msg.Err)
 	}
 }
 

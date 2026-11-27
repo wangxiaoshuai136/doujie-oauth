@@ -217,10 +217,20 @@ reported as returned by the server; the script does not fabricate a client login
 | Symptom | Meaning | Action |
 | --- | --- | --- |
 | `401 reauth_required` | Session expired or challenged | Delete the auth file, sign in or re-import |
-| `429 quota_exhausted` | Quota or rate limit hit | Wait for reset time, or redeem a reset card |
+| `429 verification_required` | Doubao risk-control verification challenge (`710022004`) | Complete the verification in Doubao, then retry after `retry_after_seconds` |
+| `429 rate_limited` | Short-term account rate limit (`710022002`) | Wait for `retry_after_seconds` |
+| `429 quota_exhausted` | Subscription quota exhausted | Wait for reset time, or redeem a reset card |
 | `502 upstream_error` | Upstream connection failure | Check network; prefer `endpoint: samantha` |
 | `signer_error` | External signer unreachable or invalid JSON | Check `signer_url`, run signer locally |
 | Empty answer | Channel/format mismatch | Use `endpoint: samantha` |
+
+`710022004` is not a quota error. The upstream stream carries
+`extra.decision.type=verify` (for example
+`verify_scene=doubao_message_web`), so the plugin reports
+`verification_required`, scopes the cooldown to the credential, and fails fast
+for other models until the window expires. Complete the verification with the
+same session used by the auth file; verifying in a different app or browser
+does not update the stored cookies.
 
 ## 8. Security Notes
 
